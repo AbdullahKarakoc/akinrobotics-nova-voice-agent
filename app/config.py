@@ -9,10 +9,20 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
+
+
+class MCPServerConfig(BaseModel):
+    # URL (Streamable HTTP, e.g. http://host:8765/mcp) or a command run as a stdio subprocess
+    # ("python" = this interpreter). A plain string in MCP_SERVERS is the same as {"target": ...}.
+    target: str
+    tools: list[str] | None = None  # allowlist of the server's tools (None = all)
+    prefix: str = ""  # prepended to tool names, e.g. to run one server twice (two languages)
+    llm_visible: bool = True  # False: called by routers only, the schema never reaches the LLM
+    max_chars: int | None = None  # trim long text fields of results (prompt tokens = prefill time)
 
 
 class Settings(BaseSettings):
@@ -94,6 +104,26 @@ class Settings(BaseSettings):
     db_path: Path = ROOT_DIR / "data" / "nova.db"
     http_tool_timeout_s: float = 5.0
     timezone: str = "Europe/Istanbul"
+    # MCP servers whose tools are added to the agent (README §2.5). An entry is a target string or an
+    # MCPServerConfig object; MCP_SERVERS=[] turns them off.
+    mcp_servers: list[str | MCPServerConfig] = Field(
+        default_factory=lambda: [
+            "python -m mcp_servers.nova_service",
+            # Public Wikipedia (third-party server, live web API): only to explain robotics terms,
+            # called by a router on a fixed glossary, never chosen by the LLM (app/tools/wikipedia.py).
+            *(
+                MCPServerConfig(
+                    target=f"python -m wikipedia_mcp --language {lang} --enable-cache --log-level ERROR",
+                    tools=["get_summary"],
+                    prefix=f"wikipedia_{lang}_",
+                    llm_visible=False,
+                    max_chars=500,
+                )
+                for lang in ("tr", "en")
+            ),
+        ]
+    )
+    mcp_connect_timeout_s: float = 30.0
 
     @property
     def docs_dir(self) -> Path:

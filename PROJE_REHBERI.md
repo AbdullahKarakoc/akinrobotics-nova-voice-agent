@@ -197,16 +197,17 @@ akınRobotics/
 │   ├── llm/                  ← LLM istemcileri (arayüz + Ollama + OpenAI uyumlu)
 │   ├── tts/                  ← ses sentezi (arayüz + Piper)
 │   ├── knowledge/            ← doküman parçalama, BM25, embedding, hibrit arama
-│   ├── tools/                ← araç kayıt defteri, yönlendiriciler, SQLite/API araçları
+│   ├── tools/                ← araç kayıt defteri, yönlendiriciler, SQLite/API araçları, MCP istemcisi
 │   ├── agent/                ← promptlar, ajan döngüsü, metin yardımcıları
 │   └── pipeline/             ← WebSocket oturumu ve metrikler
+├── mcp_servers/nova_service/ ← bağımsız MCP sunucusu (garanti, teşhis, servis talebi)
 ├── web/                      ← tarayıcı istemcisi (index.html, app.js, pcm-worklet.js, style.css)
 ├── data/
 │   ├── docs/                 ← bilgi tabanı (6 markdown, TR + EN karışık)
 │   └── seed.sql              ← örnek veritabanı (ürün, sipariş, servis merkezi)
 ├── eval/questions.json       ← 26 soruluk değerlendirme seti
 ├── scripts/                  ← model indirme, değerlendirme, benchmark'lar
-├── tests/                    ← 31 birim testi
+├── tests/                    ← 40 birim testi
 ├── reports/                  ← ölçüm sonuçları (JSON)
 ├── models/                   ← indirilen modeller (git'e girmez)
 ├── Dockerfile, docker-compose.yml, docker-compose.host-ollama.yml
@@ -440,6 +441,32 @@ ve testlerde görülen "Rehber ve iki", "Zehbe Z2", "Vehbar ve iki", "Heddar ve 
 
 ### 6.10 `app/tools/` — araçlar
 
+**Genel bakış: 10 araç, iki çağrılma yolu** (ayrıntılı tablo: README §2.6)
+
+1. **Yönlendirici (router):** LLM'den önce, soruda niyet kelimesi ve gereken bilgi birlikte varsa regex ile çalışır.
+   Doküman aramasıyla paralel yürür, sonuç LLM'e "LIVE DATA" olarak gider. İkinci LLM turu olmaz.
+2. **LLM'in araç çağrısı (yedek):** yönlendirici kaçırırsa model şemaya bakıp kendisi çağırır. LLM 8 aracın şemasını
+   görür; iki Wikipedia aracını görmez.
+
+| Araç | Nereden | Hangi soruda (yönlendirici) | Örnek |
+|---|---|---|---|
+| `get_order_status` | SQLite | "sipariş" + 3-7 haneli no | "1003 numaralı siparişim ne durumda?" |
+| `get_product_info` | SQLite | fiyat/stok/satın alma kelimesi + ürün | "Taşıyıcı T5'in fiyatı ne kadar?" |
+| `find_service_center` | SQLite | "servis/tamir" + şehir | "İzmir'de servis merkeziniz var mı?" |
+| `get_weather` | Open-Meteo | hava kelimesi + şehir | "Ankara'da hava nasıl?" |
+| `get_current_datetime` | sistem saati | "saat kaç / bugün günlerden ne" | "Saat kaç?" |
+| `check_warranty` | MCP Nova Servis | 5 haneli seri no + "garanti/bakım" | "21507 seri numaralı robotumun garantisi devam ediyor mu?" |
+| `get_robot_diagnostics` | MCP Nova Servis | 5 haneli seri no + "çalışmıyor/hata/şarj/ne durumda" | "24012 numaralı robotum çalışmıyor." |
+| `get_service_ticket_status` | MCP Nova Servis | 4 haneli no + "talep/kayıt/ticket" | "5003 numaralı servis talebim ne durumda?" |
+| `wikipedia_tr_get_summary` | MCP wikipedia-mcp | Türkçe "nedir/ne demek" + sözlük terimi | "LiDAR nedir?" |
+| `wikipedia_en_get_summary` | MCP wikipedia-mcp | İngilizce "what is" + sözlük terimi, ya da TR maddesi olmayan terim | "What is a humanoid robot?", "SLAM nedir?" |
+
+Araç **çağrılmayan** sorular da önemli: "Rehber R2'nin pil ömrü ne kadar?" ve "Garanti süresi ne kadar?" bilgi
+sorusu, dokümandan cevaplanır. "Siparişim ne durumda?" (numara yok) sorusunda yönlendirici çalışmaz, LLM numarayı
+sorar. "Rehber R2'nin sensörleri nedir?" bizim ürünümüz olduğu için Wikipedia'ya değil dokümana gider.
+Uzunluklarına göre ayrılan numaralar (seri no 5, sipariş ve talep 4 hane) ve niyet kelimeleri yönlendiricileri
+birbirinden ayırır.
+
 **`registry.py`:**
 * `Tool(name, description, parameters, required, handler, router)` ve `schema()` → LLM'e verilen JSON şema.
 * `@registry.tool(...)` dekoratörü: bir fonksiyonu araç olarak kaydeder.
@@ -475,7 +502,30 @@ ve testlerde görülen "Rehber ve iki", "Zehbe Z2", "Vehbar ve iki", "Heddar ve 
 * `get_current_datetime`: `zoneinfo` ile İstanbul saati, Türkçe gün adı.
 * Yönlendiriciler: hava kelimeleri + şehir; "saat kaç / bugün günlerden ne / what time" kalıpları.
 
-**`__init__.py`:** `create_tool_registry()` — tüm araçların bağlandığı tek yer.
+**`mcp_tools.py`:** MCP istemcisi (README §2.5).
+* `MCPConnection`: her sunucu için tek, uzun ömürlü MCP oturumu; **kendi iş parçacığında, kendi olay döngüsünde**
+  çalışır (senkron `build_services` içinden açılabilsin, istekler arasında açık kalsın). Windows'ta alt süreç için
+  Proactor döngüsü açıkça seçilir. Çağrılar `run_coroutine_threadsafe` ile o döngüye gönderilir.
+* `register()`: `tools/list` ile araçları keşfeder, şemadaki pydantic `title` alanlarını atar (gereksiz prompt
+  token'ı), aracı yerel araçlarla aynı `Tool` olarak ekler. Sunucu açılamazsa uyarı loglanır ve atlanır.
+* `ROUTERS`: MCP araçlarının deterministik yönlendiricileri **ajan tarafında**, araç adına göre. Seri no 5 hane,
+  talep no 4 hane. Türkçe ünsüz yumuşamasına dikkat: "talep" → "talebim" (`tale[pb]`).
+* Sunucu başına ayar (`MCPServerConfig`, `app/config.py`): `tools` (araç filtresi), `prefix` (aynı sunucunun iki
+  örneği için ad öneki), `llm_visible` (false: yalnızca router çağırır, şema LLM'e gitmez), `max_chars` (uzun
+  metinleri cümle sonundan kısaltır). Sunucular paralel başlatılır.
+* `registry.py`'deki küçük ekler: `add()`, `on_close()/close()` (MCP alt süreci kapanışta düzgün durur),
+  `Tool.llm_visible` ve `**kwargs` alan işleyicilere yalnızca şemada tanımlı argümanların geçirilmesi.
+
+**`wikipedia.py`:** üçüncü taraf `wikipedia-mcp` sunucusunun (TR + EN iki örnek) router'ları. Yalnızca "X nedir /
+what is X" kalıbında ve X sabit robotik terim sözlüğündeyse çalışır. Sözlük doğrulanmış madde başlıklarını tutar,
+çünkü `get_summary` başlığı birebir istiyor ("LiDAR" yok, "LIDAR" var) ve arama konudan kayabiliyor ("Lidar
+Höyük"). Soru bizim ürünümüzle ilgiliyse çalışmaz. Araç LLM'e gösterilmez, yani alan dışı sorular eskisi gibi reddedilir.
+
+**`mcp_servers/nova_service/`:** ajandan bağımsız MCP sunucusu (`MCPServer`, resmi `mcp` SDK 2.x). Garanti, uzaktan
+teşhis ve servis talebi araçları; kendi `seed.sql`'i bellekteki SQLite'a yüklenir. Kararlar metin olarak döner
+("garanti YOK: …"), çünkü 4B model `"in_warranty": false` alanını "garanti devam ediyor" diye okudu.
+
+**`__init__.py`:** `create_tool_registry()` — tüm araçların bağlandığı tek yer (yerel araçlar + `MCP_SERVERS`).
 
 ### 6.11 `app/agent/` — ajanın beyni
 
@@ -622,13 +672,14 @@ Ankara" bir ret değildir), `tool` (çağrılması gereken araç). Canlı kullan
 | `benchmark_stt.py` | FLEURS gerçek insan sesiyle WER/RTF; standart vs. bizim çözümleme; `--models`, `--variants`, `--langs`, `--threads`, `--beam` | tar.gz'yi **akışla** okuyup ilk N kaydı alır (750 MB indirmeden) |
 | `report_table.py` | `reports/eval_*.json` → README tablosu | — |
 
-### 6.17 `tests/` — 31 birim testi (model gerektirmez, ~4 sn)
+### 6.17 `tests/` — 40 birim testi (model gerektirmez, ~10 sn)
 
 | Dosya | Test ettiği | Teknik |
 |---|---|---|
 | `test_vad.py` | Tur sonu durum makinesi | `ScriptedVAD`: sahte olasılık dizisi → deterministik |
 | `test_agent.py` | Ajan döngüsü, araç çağrısı, dolgu, sızan JSON, full mod, hata | `ScriptedLLM`: önceden yazılmış olay dizileri |
 | `test_tools.py` | Sipariş numarası biçimleri, ürün eşleştirme, yönlendiriciler, şehir çıkarma | Geçici SQLite (`tmp_path`) |
+| `test_mcp_tools.py` | Nova Servis mantığı, MCP ve Wikipedia yönlendiricileri, gerçek stdio bağlantısı, sunucu ayarları, açılamayan sunucunun atlanması | Sabit "bugün" (`monkeypatch`); Wikipedia'ya ağ isteği atılmaz |
 | `test_knowledge.py` | Türkçe küçük harf, kök kesme, parçalama, BM25, eşik | `FakeEmbedder` (harf frekansı vektörü) |
 | `test_speech_text.py` | Cümle bölme, TTS temizliği, dil tespiti, sayı kontrolü, terim düzeltme, tekrar kırpma | — |
 

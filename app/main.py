@@ -51,6 +51,7 @@ async def lifespan(app: FastAPI):
     yield
     warmup.cancel()
     await services.agent.llm.aclose()
+    await asyncio.to_thread(services.agent.tools.close)
 
 
 app = FastAPI(title="Nova Voice Agent", lifespan=lifespan)

@@ -42,6 +42,9 @@ class Tool:
     # parallel with retrieval, which saves a whole LLM round and doesn't depend on a small
     # model choosing to call the tool.
     router: Router | None = None
+    # False: only routers call it; its schema is not offered to the LLM (no prompt tokens, and
+    # the model cannot decide to use it, e.g. for an off-topic question).
+    llm_visible: bool = True
 
     def schema(self) -> dict[str, Any]:
         return {
@@ -66,6 +69,19 @@ class ToolRegistry:
     def __init__(self, timeout_s: float = 8.0):
         self.tools: dict[str, Tool] = {}
         self.timeout_s = timeout_s
+        self._closers: list[Callable[[], None]] = []
+
+    def add(self, tool: Tool) -> None:
+        self.tools[tool.name] = tool
+
+    def on_close(self, fn: Callable[[], None]) -> None:
+        """Register cleanup for a tool source that holds a connection (e.g. an MCP session)."""
+        self._closers.append(fn)
+
+    def close(self) -> None:
+        for fn in self._closers:
+            fn()
+        self._closers.clear()
 
     def tool(
         self,
@@ -78,13 +94,13 @@ class ToolRegistry:
         def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
             params = parameters or {}
             required_params = required if required is not None else list(params)
-            self.tools[name] = Tool(name, description, params, required_params, fn, router)
+            self.add(Tool(name, description, params, required_params, fn, router))
             return fn
 
         return decorator
 
     def schemas(self) -> list[dict[str, Any]]:
-        return [t.schema() for t in self.tools.values()]
+        return [t.schema() for t in self.tools.values() if t.llm_visible]
 
     def route(self, text: str) -> list[ToolCall]:
         """Tool calls whose router fires on this user text."""
@@ -100,7 +116,10 @@ class ToolRegistry:
         try:
             if tool is None:
                 raise KeyError(f"unknown tool '{call.name}'")
-            accepted = set(inspect.signature(tool.handler).parameters)
+            params = inspect.signature(tool.handler).parameters
+            # Generic (**kwargs) handlers, e.g. MCP proxies, accept what the tool's schema declares.
+            var_kw = any(p.kind is p.VAR_KEYWORD for p in params.values())
+            accepted = set(tool.parameters) if var_kw else set(params)
             kwargs = {k: v for k, v in call.arguments.items() if k in accepted}
             if inspect.iscoroutinefunction(tool.handler):
                 result = await asyncio.wait_for(tool.handler(**kwargs), self.timeout_s)

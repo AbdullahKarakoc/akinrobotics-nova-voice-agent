@@ -20,6 +20,7 @@ COPY requirements.txt .
 RUN pip install -r requirements.txt
 
 COPY app ./app
+COPY mcp_servers ./mcp_servers
 COPY web ./web
 COPY data ./data
 COPY eval ./eval

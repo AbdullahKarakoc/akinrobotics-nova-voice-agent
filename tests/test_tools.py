@@ -62,11 +62,13 @@ def test_routers_fire_only_on_clear_intents(registry):
     assert routed("Ankara'da havanası") == [("get_weather", {"city": "Ankara"})]  # STT glued the words
     assert routed("Ankara'da havan nasıl?") == [("get_weather", {"city": "Ankara"})]
     assert routed("What time is it?") == [("get_current_datetime", {})]
+    assert routed("Saat kaç?") == [("get_current_datetime", {})]
     # knowledge questions and ambiguous ones go to the LLM
     assert routed("Rehber R2'nin pil ömrü ne kadar?") == []
     assert routed("How much does the Rehber R2 weigh?") == []
     assert routed("Teslimat ne kadar sürer?") == []
     assert routed("Hava nasıl?") == []  # no city -> let the model ask
+    assert routed("Siparişim ne durumda?") == []  # no number -> let the model ask
 
 
 def test_extract_city():

@@ -82,7 +82,7 @@ cp .env.example .env                                # ayar şablonu (gizli bilgi
 # Model .env'deki LLM_MODEL: GPU'da hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:IQ4_XS önerilir.
 python -m scripts.download_models                   # Whisper, Piper sesleri, embedding modeli
 python -m app                                       # http://localhost:8000
-pytest                                              # 31 birim testi, model gerektirmez
+pytest                                              # 40 birim testi, model gerektirmez (MCP testleri sunucuyu yerelde başlatır)
 ```
 
 ### Diğer giriş noktaları
@@ -110,6 +110,8 @@ flowchart LR
     VAD -->|ifade| STT[faster-whisper small<br/>dil tespiti TR/EN]
     STT --> AG{Ajan}
     AG -->|paralel| RT[Araç yönlendirici<br/>SQLite · Open-Meteo · saat]
+    RT <-->|MCP · stdio / HTTP| MCP[Nova Servis MCP sunucusu<br/>garanti · teşhis · servis talebi]
+    RT <-->|MCP · stdio| WIKI[wikipedia-mcp TR / EN<br/>terim açıklama · canlı web]
     AG -->|paralel| RAG[Hibrit arama<br/>BM25 + çok dilli embedding]
     RT --> LLM[LLM · Ollama · 4-bit<br/>Qwen3-4B-Instruct · araç çağırma]
     RAG --> LLM
@@ -125,6 +127,7 @@ flowchart LR
 | Dil modeli | **Ollama** + **Qwen3-4B-Instruct-2507, 4-bit** — GPU'da IQ4_XS (2.1 GB), CPU'da Q4_K_M (2.5 GB). Hızlı seçenek: Qwen3 1.7B Q4_K_M (düşünme kapalı) | Açık ağırlıklı (Apache-2.0), Türkçesi ve araç çağırması iyi. 4B Instruct: düşünme modu olmayan, talimat takibi için eğitilmiş sürüm; 1.7B'ye göre alan dışı ve STT'nin bozduğu sorularda belirgin biçimde daha az uydurma (ret 3/5 → 4/5, kaynaksız sayı 1 → 0, §4.3). IQ4_XS, 4 GB kartın kullanılabilir ~2.9 GB'ına %90 sığıyor; CPU'da k-quant (Q4_K_M) daha hızlı. 4-bit kuantizasyon fp16'ya göre ~3.5 kat az bellek; bu boyutta kalite kaybı küçük. Ollama: tek komutla model yönetimi (Hugging Face GGUF dahil), CPU/GPU (Vulkan), prompt (KV) önbelleği. Seçim 5 model ölçülerek yapıldı (§4.3). |
 | Bilgi tabanı | **Hibrit arama**: BM25 (Türkçe için 5 harf kök kesme) + `paraphrase-multilingual-MiniLM-L12-v2` (fastembed / ONNX) | Türkçe soru İngilizce dokümanı bulabilir (diller arası); BM25 "T5", "E02" gibi kodları yakalar. PyTorch gerektirmez (imaj küçük). Küçük korpus için NumPy yeterli. |
 | Araçlar | **SQLite** (sipariş, fiyat/stok, servis merkezi), **Open-Meteo** (hava, anahtarsız), saat/tarih | Ödevdeki "doküman + veritabanı + API" kaynak türlerinin üçü de var. Değişken veriler (fiyat, stok) dokümanda değil veritabanında. |
+| Harici araçlar | **MCP** (Model Context Protocol, resmi `mcp` Python SDK): kendi "Nova Servis" sunucumuz (garanti, uzaktan teşhis, servis talebi) + üçüncü taraf **wikipedia-mcp** (robotik terimlerini açıklama) | Başka bir ekibin sistemine ve hazır, açık kaynak bir sunucuya kod bağımlılığı olmadan, aynı protokolle bağlanmayı gösterir; yeni bir sunucu ajan kodu değişmeden `MCP_SERVERS` ile eklenir (§2.5). |
 | Ses sentezi | **Piper** (VITS, ONNX) `tr_TR-dfki-medium`, `en_US-ryan-medium` | CPU'da gerçek zamanın ~10 katı hızlı (RTF ≈ 0.1), her iki dilde ses var, tamamen yerel. |
 | Taşıma / arayüz | **FastAPI + WebSocket**, tarayıcıda AudioWorklet | Tam çift yönlü akış: kullanıcı ajan konuşurken araya girebilir. Kurulum gerektirmeyen istemci. |
 
@@ -134,7 +137,8 @@ flowchart LR
   arkasında; seçim yapılandırma ile yapılır ([app/stt](app/stt), [app/tts](app/tts), [app/llm](app/llm)).
   LLM için iki arka uç var: **Ollama** yerel API'si ve **OpenAI uyumlu** herhangi bir sunucu (vLLM, llama.cpp
   `llama-server`, LM Studio, OpenAI, Groq…): `LLM_BACKEND=openai LLM_BASE_URL=http://host:8080/v1 LLM_MODEL=...`.
-  Tek bir kapalı servise bağımlılık yok; varsayılan kurulum tamamen yerel ve internetsiz çalışır (hava durumu aracı hariç).
+  Tek bir kapalı servise bağımlılık yok; varsayılan kurulum tamamen yerel ve internetsiz çalışır (hava durumu ve Wikipedia araçları hariç; internet
+  yoksa bu iki araç "bilgi şu an yok" döner).
 * **Yeni bilgi kaynağı eklemek:** `data/docs/` klasörüne `.md`/`.txt` dosyası bırakmak yeterli; açılışta parçalanıp
   indekslenir (embedding'ler içerik özetine göre önbelleklenir).
 * **Yeni araç eklemek:** bir fonksiyon + dekoratör:
@@ -204,6 +208,128 @@ Türkçe ifadeler aksi halde Azerice vb. sanılabiliyor). Cevap dili LLM'e hedef
 Bilgi tabanı karışık dillidir (bazı dokümanlar İngilizce); çok dilli embedding ile Türkçe soru İngilizce dokümandan
 cevaplanabilir. Yeni dil eklemek: `LANGUAGES`, bir Piper sesi ve iki kısa metin (dolgu/hata cümlesi).
 
+### 2.5 MCP araçları (Model Context Protocol)
+
+Ajan, açılışta `MCP_SERVERS`'taki sunuculara bağlanır ([app/tools/mcp_tools.py](app/tools/mcp_tools.py)).
+`tools/list` ile araçları keşfeder ve kayıt defterine yerel araçlarla aynı biçimde ekler; zaman aşımı ve hata
+yönetimi de aynıdır. Her oturum kendi arka plan olay döngüsünde yaşar, böylece eşzamanlı (senkron) açılış kodundan
+kurulabilir ve istekler arasında açık kalır. Sunucular paralel başlatılır. Açılamayan sunucu loglanıp atlanır,
+ajan diğer araçlarıyla çalışmaya devam eder. Varsayılan olarak iki tür sunucu bağlıdır:
+
+**1. Nova Servis (kendi sunucumuz):** [mcp_servers/nova_service](mcp_servers/nova_service). Başka bir ekibin satış
+sonrası sistemini temsil eder. Ajan bu sunucunun kodunu import etmez. Kendi kurgusal verisi vardır ve araçları salt
+okunurdur.
+
+| Araç | Ne döner | Yönlendirici (LLM'siz) |
+|---|---|---|
+| `check_warranty` | Seri numarasına göre garanti (standart/uzatılmış), batarya garantisi, periyodik bakım durumu | seri no (5 hane) + "garanti/bakım" |
+| `get_robot_diagnostics` | Uzaktan teşhis: çevrimiçi mi, pil %, yazılım sürümü, aktif hata kodu ve müşterinin yapabileceği | seri no + "çalışmıyor/hata/şarj/ne durumda…" |
+| `get_service_ticket_status` | Servis talebinin durumu, teknisyen ziyareti, beklenen çözüm tarihi | talep no (4 hane) + "talep/kayıt/ticket" |
+
+**2. Wikipedia (üçüncü taraf, açık kaynak sunucu):** [`wikipedia-mcp`](https://github.com/rudra-ravi/wikipedia-mcp),
+canlı Wikipedia API'sine gider. TR ve EN için iki ayrı örnek çalışır. Tek görevi, müşterinin cevaplarda ve
+dokümanlarda karşılaştığı **robotik/teknoloji terimlerini açıklamaktır**: "LiDAR nedir?", "SLAM ne demek?",
+"What is a humanoid robot?".
+
+| Sunucunun sunduğu | Ajanın aldığı |
+|---|---|
+| 22 araç (11'i önekli kopya) | yalnızca `get_summary` (`wikipedia_tr_` / `wikipedia_en_` önekiyle) |
+| LLM'in seçtiği araç | **yalnızca yönlendirici çağırır**, şema LLM'e hiç gösterilmez (`llm_visible=false`) |
+| 4.700 karaktere kadar özet | cümle sonundan kesilmiş en fazla 500 karakter (`max_chars`) |
+
+Bu sınırların nedeni ölçümlerde görüldü:
+
+* `get_summary` başlığı birebir istiyor ("LiDAR" bulunamıyor, "LIDAR" var).
+* Arama sonuçları konudan kayabiliyor: "lidar" aramasının ikinci sonucu Şanlıurfa'daki "Lidar Höyük".
+* Asıl risk, ajanın genel kültür botuna dönüşmesiydi.
+
+Bu yüzden terimler ve doğrulanmış madde başlıkları sabit bir sözlükte duruyor ([app/tools/wikipedia.py](app/tools/wikipedia.py)).
+Yönlendirici yalnızca "X nedir / ne demek / what is X" kalıbında ve X sözlükteyse çalışır. Türkçe maddesi olmayan
+terimler (SLAM, OTA) İngilizce maddeden cevaplanır. Soru bizim ürünümüzle ilgiliyse ("Rehber R2'nin sensörleri
+nedir?") Wikipedia çağrılmaz, cevap dokümandan gelir. Web metni yalnızca bilinen maddelerden geldiği için prompt
+injection yüzeyi de küçük kalıyor.
+
+**Sunucu ayarları** (`MCP_SERVERS`, JSON liste). Bir girdi ya bir dize ya da bir nesnedir:
+
+```json
+["python -m mcp_servers.nova_service",
+ {"target": "python -m wikipedia_mcp --language tr", "tools": ["get_summary"],
+  "prefix": "wikipedia_tr_", "llm_visible": false, "max_chars": 500}]
+```
+
+* `target`: stdio ile başlatılacak komut ya da Streamable HTTP adresi (`http://host:8765/mcp`). Nova Servis'i ayrı
+  çalıştırmak için `python -m mcp_servers.nova_service --http` kullanılır. MCP Inspector veya Claude Desktop da bağlanabilir.
+* `MCP_SERVERS='["python -m mcp_servers.nova_service"]'`: Wikipedia olmadan, tamamen internetsiz çalışır.
+  `MCP_SERVERS=[]`: tüm MCP araçları kapalı.
+
+**Bu projenin kurallarına nasıl uyuyor:**
+
+* **Yönlendiriciler ajan tarafında, araç adına göre tanımlı.** Bunlar ajanın gecikme stratejisinin parçası, veri
+  kaynağının değil. Seri numarası 5, talep ve sipariş numarası 4 hanelidir; yönlendiriciler bu sayede birbirine ve
+  sipariş yönlendiricisine karışmaz.
+* **Genel web araçları LLM'e verilmez.** Her ek şema, 4B modelin araç seçimini zorlaştırır ve önbelleklenen
+  prompt'u büyütür. Wikipedia'nın LLM'e eklediği şema sayısı sıfırdır.
+* **Araç çıktısında karar metin olarak yazılır.** İlk sürümde `"in_warranty": false` dönülüyordu, model ise
+  "garantisi devam ediyor" dedi. "expired on 2026-05-20" bile yetmedi, çünkü model bugünün tarihini bilmiyor. Şimdi
+  sonuç baştan veriliyor: `"garanti YOK: garanti süresi 2026-05-20 tarihinde doldu"`. Bu değişiklikten sonra
+  denenen 5 garanti sorusunun 5'inde olgu doğruydu.
+
+**Ölçülen maliyet** (§4.1 donanımı):
+
+* **Açılış:** üç sunucu paralel başlıyor, bağlantı + araç keşfi toplam ~5.9 sn (sırayla ~11 sn olurdu).
+  Modeller yüklenirken geçtiği için kullanıcı hissetmez.
+* **Nova Servis (yerel stdio):** ilk çağrı ~125-160 ms, sonra **12-24 ms**. Yerel SQLite aracı ~7 ms. ~6 sn'lik bir
+  turda ölçülebilir bir fark yaratmıyor.
+* **Wikipedia (canlı web):** çağrı başına **~0.7-1.0 sn**. Arama ile paralel çalışıyor ama yine de terim sorularında
+  ilk sesi bu kadar geciktiriyor. Ayrıca bu sorularda daha zengin bağlam olduğu için cevaplar da uzun: "LiDAR nedir?"
+  ve "Yapay zeka nedir?" toplam ~14-15 sn, kısa cevaplı "SLAM ne demek?" ~8 sn. İlk cümle akışla okunduğu için bu
+  sürenin tamamı beklenmiyor.
+
+**Mevcut davranış bozuldu mu?** 26 soruluk eval (GPU, IQ4_XS), önce yalnızca Nova Servis, sonra Wikipedia da açıkken
+iki kez tekrar çalıştırıldı. Doğruluk sayıları her ikisinde de değişmedi: 24/26 geçti, olgu 18/19, ret 4/5, araç
+seçimi 7/7, dil 26/26, kaynaksız sayı 0. Medyan gecikme 5847 → 5995 / 5936 ms, ilk token 1910 → 1980 / 1978 ms. Bu
+fark ölçüm gürültüsü düzeyinde. Eval'deki alan dışı sorularda Wikipedia hiç çağrılmadı.
+
+### 2.6 Araçlar: hangi soru hangi aracı çağırır
+
+Bir araç iki yoldan çağrılır:
+
+1. **Yönlendirici (router), LLM'den önce:** soruda niyet kelimesi ve gereken bilgi (numara, şehir, ürün, terim)
+   birlikte varsa araç regex ile tanınır ve doküman aramasıyla **paralel** çalışır. Sonuç LLM'e "LIVE DATA" olarak
+   hazır verilir, ikinci bir LLM turu gerekmez. Bir soruda birden çok yönlendirici tetiklenebilir; hepsi paralel çalışır.
+2. **LLM'in kendi araç çağrısı (yedek yol):** yönlendirici tetiklenmezse (bilgi eksik, alışılmadık ifade) model
+   araç şemalarına bakıp kendisi çağırabilir. Tur başına en fazla 2 araç turu yapılır. Araç beklenirken "Bir saniye,
+   kontrol ediyorum." denir. Wikipedia araçları bu yolda **yoktur**: LLM onları görmez.
+
+| Araç | Kaynak | Ne döner | Yönlendirici ne zaman çağırır | Örnek soru |
+|---|---|---|---|---|
+| `get_order_status` | SQLite | Sipariş durumu, tahmini teslim | "sipariş/order" + 3-7 haneli numara | "1003 numaralı siparişim ne durumda?" |
+| `get_product_info` | SQLite | Liste fiyatı (KDV hariç), stok, teslim süresi | "fiyat/ücret/kaç para/stok/satın al/teslim/price/cost/stock/buy" + ürün adı, kodu veya takma adı | "Taşıyıcı T5'in fiyatı ne kadar?", "How much does the education kit cost?" |
+| `find_service_center` | SQLite | Servis merkezi adresi ve telefonu | "servis/tamir/service center" + şehir | "İzmir'de servis merkeziniz var mı?" |
+| `get_weather` | Open-Meteo (canlı web) | Sıcaklık, hava durumu, günlük min/maks | hava kelimeleri ("hava nasıl", "sıcaklık", "weather") + şehir | "Ankara'da hava nasıl?" |
+| `get_current_datetime` | Sistem saati | Tarih, gün, saat (İstanbul) | "saat kaç / bugün günlerden ne / what time" | "Saat kaç?" |
+| `check_warranty` | MCP · Nova Servis | Garanti VAR/YOK ve bitiş tarihi, batarya garantisi, bakım durumu | 5 haneli seri no + "garanti/bakım/warranty/maintenance" | "21507 seri numaralı robotumun garantisi devam ediyor mu?" |
+| `get_robot_diagnostics` | MCP · Nova Servis | Çevrimiçi mi, pil %, yazılım sürümü, aktif hata ve öneri | 5 haneli seri no + "çalışmıyor/hata/arıza/şarj/ne durumda/status/offline" | "24012 numaralı robotum çalışmıyor." |
+| `get_service_ticket_status` | MCP · Nova Servis | Talep durumu, teknisyen ziyareti, beklenen çözüm | 4 haneli numara + "talep/kayıt/başvuru/ticket/request" | "5003 numaralı servis talebim ne durumda?" |
+| `wikipedia_tr_get_summary` | MCP · wikipedia-mcp (TR, canlı web) | Türkçe madde özeti (≤ 500 karakter) | Türkçe "nedir/ne demek/nasıl çalışır" + sözlükteki terim (Türkçe maddesi varsa) | "LiDAR nedir?", "Yapay zeka ne demek?" |
+| `wikipedia_en_get_summary` | MCP · wikipedia-mcp (EN, canlı web) | İngilizce madde özeti (≤ 500 karakter) | İngilizce "what is/what does … mean" + sözlükteki terim; ya da Türkçe maddesi olmayan terim | "What is a humanoid robot?", "SLAM nedir?" |
+
+**Araç çağırmayan sorular:**
+
+| Soru | Ne olur |
+|---|---|
+| "Rehber R2'nin pil ömrü ne kadar?" | Fiyat/stok kelimesi yok, bilgi sorusu: dokümandan (RAG) cevaplanır. |
+| "Rehber R2'nin sensörleri nedir?" | Bizim ürünümüzle ilgili: Wikipedia değil, doküman. |
+| "Garanti süresi ne kadar?" | Numara yok, genel politika: doküman. |
+| "Siparişim ne durumda?" / "Hava nasıl?" | Numara veya şehir yok, yönlendirici tetiklenmez. LLM eksik bilgiyi kullanıcıya sorar. Sipariş aracını numarasız çağırırsa araç "numara yok, kullanıcıya sor" döner. |
+| "1003 numaralı siparişim ne durumda?" | 4 hane ama "sipariş" geçiyor: servis talebi değil, sipariş aracı. |
+| "Türkiye'nin başkenti nedir?" | Alan dışı. Hiçbir araç çağrılmaz, model reddetmelidir (bu soru küçük modellerin bilinen zayıflığı, §5). |
+
+Yönlendiriciler: yerel araçlar için [app/tools/database.py](app/tools/database.py) ve
+[app/tools/web_apis.py](app/tools/web_apis.py), MCP araçları için [app/tools/mcp_tools.py](app/tools/mcp_tools.py) ve
+[app/tools/wikipedia.py](app/tools/wikipedia.py). Örnek soruların hepsi birim testlerinde doğrulanıyor
+([tests/test_tools.py](tests/test_tools.py), [tests/test_mcp_tools.py](tests/test_mcp_tools.py)).
+
 ---
 
 ## 3. Proje yapısı
@@ -215,7 +341,9 @@ app/
   llm/                      LLM arayüzü + Ollama ve OpenAI-uyumlu akışlı istemciler
   tts/                      TTS arayüzü + Piper
   knowledge/                doküman parçalama, Türkçe BM25, embedding, hibrit arama
-  tools/                    araç kayıt defteri, yönlendiriciler, SQLite ve web API araçları
+  tools/                    araç kayıt defteri, yönlendiriciler, SQLite ve web API araçları, MCP istemcisi,
+                            Wikipedia terim sözlüğü
+mcp_servers/nova_service/   bağımsız MCP sunucusu: garanti, robot teşhisi, servis talebi (kendi örnek verisiyle)
   agent/                    promptlar, ajan döngüsü (arama → LLM → araçlar), metin yardımcıları
   pipeline/session.py       WebSocket oturumu: VAD → STT → ajan → TTS, barge-in, metrikler
   main.py                   FastAPI: arayüz, /ws, /api/chat, /api/metrics, /health
@@ -447,4 +575,6 @@ python -m scripts.report_table                    # README tablosu
   (bir denemede araçtan gelen "Cuma"yı "Cumartesi" dedi). Sayısal uydurmalar sayı kontrolüyle yakalanıyor; sözel olanlar
   yakalanmıyor. Daha güçlü bir model ya da cevap sonrası LLM tabanlı doğrulama (ek gecikme pahasına) bunu azaltır.
 * **Yankı:** hoparlörle kullanımda araya girme, tarayıcının yankı gidermesine güvenir; kulaklık önerilir ya da `BARGE_IN=false`.
-* **Kimlik doğrulama yok:** sipariş sorgusu numarayla yapılır; gerçek sistemde müşteri doğrulaması gerekir.
+* **Kimlik doğrulama yok:** sipariş, seri numarası ve servis talebi sorguları yalnızca numarayla yapılır; gerçek
+  sistemde müşteri doğrulaması gerekir. Bu yüzden MCP araçları müşteri adı döndürmez ve hiçbiri veri yazmaz
+  (sesle servis talebi açmak doğrulama + onay adımı ister).

@@ -12,3 +12,5 @@ fastembed==0.9.0
 huggingface_hub==1.33.0
 tzdata==2026.5
 websockets==17.2
+mcp==2.3.0
+wikipedia-mcp==2.0.1

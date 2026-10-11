@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Nova Sesli Asistan</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo" aria-hidden="true"></span>
+        <div>
+          <h1>Nova Sesli Asistan</h1>
+          <p class="subtitle">Türkçe / English · sesten sese yapay zeka ajanı</p>
+        </div>
+      </div>
+      <div class="conn" id="conn" data-state="offline">bağlantı yok</div>
+    </header>
+
+    <main class="layout">
+      <section class="stage">
+        <button id="mic" class="mic" data-state="idle" aria-label="Konuşmayı başlat">
+          <span class="ring" id="ring"></span>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2Z" />
+          </svg>
+        </button>
+        <p class="status" id="status">Başlamak için mikrofona bir kez dokunun</p>
+        <p class="hint">Mikrofon konuşma boyunca açık kalır; her soru için tekrar basmanız gerekmez. Sustuğunuzda
+          asistan cevap verir. Kulaklıkla asistanın sözünü keserek konuşabilirsiniz.</p>
+        <button id="mic-off" class="ghost" hidden>Dinlemeyi durdur</button>
+
+        <div class="latency card" id="latency" hidden>
+          <div class="latency-head">
+            <span>Son tur</span>
+            <strong id="lat-total">–</strong>
+          </div>
+          <div class="bar" id="lat-bar"></div>
+          <dl class="legend" id="lat-legend"></dl>
+          <p class="avg" id="lat-avg"></p>
+        </div>
+      </section>
+
+      <section class="chat card">
+        <div class="chat-head">
+          <h2>Konuşma</h2>
+          <button id="reset" class="ghost">Sıfırla</button>
+        </div>
+        <ol class="messages" id="messages">
+          <li class="empty">Örnek sorular: “Rehber R2'nin pil ömrü ne kadar?”, “1003 numaralı siparişim nerede?”, “What is the warranty period?”, “Ankara'da hava nasıl?”</li>
+        </ol>
+        <form class="composer" id="composer">
+          <input id="text" type="text" placeholder="Yazarak da sorabilirsiniz…" autocomplete="off" />
+          <button type="submit">Gönder</button>
+        </form>
+      </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>

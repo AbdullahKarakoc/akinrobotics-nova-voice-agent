@@ -1,0 +1,18 @@
+# Override: use the Ollama server running on the host machine instead of the container
+# (the GPU path: Docker Desktop does not pass AMD GPUs into containers).
+#   docker compose -f docker-compose.yml -f docker-compose.host-ollama.yml up --build agent
+# With a GPU the larger model is the default (README §4.3); the agent pulls it into the host
+# Ollama on first start if it is missing. Another model: LLM_MODEL_GPU=qwen3:1.7b-q4_K_M
+services:
+  agent:
+    environment:
+      LLM_BASE_URL: http://host.docker.internal:11434
+      # Qwen3-4B-Instruct-2507, 4-bit (IQ4_XS, 2.1 GB): ~95% of its layers fit in a 4 GB card at 3072 context
+      LLM_MODEL: ${LLM_MODEL_GPU:-hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:IQ4_XS}
+      LLM_NUM_CTX: 3072
+      # Only the few layers that don't fit in VRAM run on the CPU; leave cores free for TTS, which
+      # synthesizes while the LLM is still generating.
+      LLM_NUM_THREAD: 4
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on: !reset {}

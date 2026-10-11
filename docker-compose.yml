@@ -1,0 +1,58 @@
+# Self-contained stack: Ollama (LLM server) + the voice agent.
+#   docker compose up --build        ->  http://localhost:8000
+# Use an Ollama that already runs on the host (e.g. with GPU) instead:
+#   docker compose -f docker-compose.yml -f docker-compose.host-ollama.yml up --build
+
+# 4-bit quantized. Q4_K_M rather than the IQ4_XS used on the GPU: k-quants run faster on CPUs.
+# Faster, less accurate: LLM_MODEL=qwen3:1.7b-q4_K_M (README §4.3).
+x-llm-model: &llm_model ${LLM_MODEL:-hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M}
+
+services:
+  ollama:
+    image: ollama/ollama:0.40.2
+    volumes:
+      - ollama:/root/.ollama
+    environment:
+      OLLAMA_KEEP_ALIVE: 30m
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      start_period: 60s
+      start_interval: 3s  # frequent checks only while starting, then once a minute (keeps logs readable)
+      interval: 60s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # One-shot job: pulls the LLM into the Ollama volume (no-op when already present).
+  ollama-pull:
+    image: ollama/ollama:0.40.2
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["ollama", "pull", *llm_model]
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: "no"
+
+  agent:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # Fixed here (not read from .env, whose LLM_BASE_URL is meant for local runs).
+      LLM_BACKEND: ollama
+      LLM_BASE_URL: http://ollama:11434
+      LLM_MODEL: *llm_model
+    volumes:
+      - models:/models
+    depends_on:
+      ollama-pull:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  ollama:
+  models:

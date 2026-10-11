@@ -1,0 +1,652 @@
+{
+  "summary": {
+    "model": "qwen2.5:3b",
+    "passed": "22/24",
+    "fact_accuracy": "18/18",
+    "correct_refusals": "2/4",
+    "tool_selection": "7/7",
+    "answer_language": "24/24",
+    "answers_with_ungrounded_numbers": 1,
+    "latency_ms_p50": 9840,
+    "llm_ttft_ms_p50": 2566
+  },
+  "cases": [
+    {
+      "q": "Rehber R2'nin pil ömrü ne kadar?",
+      "lang": "tr",
+      "expect": [
+        "8"
+      ],
+      "answer": "Rehber R2'nin pil ömrü tek şarjla 8 saattir. Tam şarj süresi 3 saattir.",
+      "tools": [],
+      "checks": {
+        "fact": true,
+        "language": true
+      },
+      "ok": true,
+      "ms": 9943,
+      "ungrounded_numbers": [],
+      "metrics": {
+        "total_ms": 9933,
+        "retrieval_ms": 39.1,
+        "llm_ttft_ms": 3278,
+        "tool_ms": 0,
+        "llm_rounds": 1,
+        "prompt_tokens": 3162,
+        "completion_tokens": 36
+      }
+    },
+    {
+      "q": "Taşıyıcı T5 kaç kilo taşıyabilir?",
+      "lang": "tr",
+      "expect": [
+        "150"
+      ],
+      "answer": "Taşıyıcı T5, 150 kilogram taşıyabilir.",
+      "tools": [],
+      "checks": {
+        "fact": true,
+        "language": true
+      },
+      "ok": true,
+      "ms": 5595,
+      "ungrounded_numbers": [],
+      "metrics": {
+        "total_ms": 5591,
+        "retrieval_ms": 34.4,
+        "llm_ttft_ms": 2418,
+        "tool_ms": 0,
+        "llm_rounds": 1,
+        "prompt_tokens": 3158,
+        "completion_tokens": 18
+      }
+    },
+    {
+      "q": "Temizlik C3 saatte ne kadar alan temizleyebilir?",
+      "lang": "tr",
+      "expect": [
+        "1.500",
+        "1500",
+        "bin beş yüz"
+      ],
+      "answer": "Temizlik C3 saatte 1.500 metrekare temizleyebilir.",
+      "tools": [],
+      "checks": {
+        "fact": true,
+        "language": true
+      },
+      "ok": true,
+      "ms": 7106,
+      "ungrounded_numbers": [],
+      "metrics": {
+        "total_ms": 7102,
+        "retrieval_ms": 33.1,
+        "llm_ttft_ms": 2660,
+        "tool_ms": 0,
+        "llm_rounds": 1,
+        "prompt_tokens": 3162,
+        "completion_tokens": 24
+      }
+    },
+    {
+      "q": "Robotların garanti süresi kaç yıl?",
+      "lang": "tr",
+      "expect": [
+        "2",
+        "iki"
+      ],
+      "answer": "Robotların standart garanti süresi 2 yıl olup, maksimum 5 yıl olabilir.",
+      "tools": [],
+      "checks": {
+        "fact": true,
+        "language": true
+      },
+      "ok": true,
+      "ms": 6785,
+      "ungrounded_numbers": [],
+      "metrics": {
+        "total_ms": 6781,
+        "retrieval_ms": 33.8,
+        "llm_ttft_ms": 2432,
+        "tool_ms": 0,
+        "llm_rounds": 1,
+        "prompt_tokens": 3158,
+        "completion_tokens": 24
+      }
+    },
+    {
+      "q": "Acil bir durumda robotu nasıl durdururum?",
+      "lang": "tr",
+      "expect": [
+        "kırmızı"
+      ],
+      "answer": "Robotu durdurmak için sağ omzunun arkasındaki kırmızı acil durdurma düğmesine basın. Tüm hareketler durdurulur. Yeniden başlatmak için düğmeyi saat yönünde çevirerek serbest bırakın.",
+      "tools": [],
+      "checks": {
+        "fact": true,
+        "language": true
+      },
+      "ok": true,
+      "ms": 13652,
+      "ungrounded_numbers": [],
+      "metrics": {
+        "total_ms": 13648,
+        "retrieval_ms": 70.3,
+        "llm_ttft_ms": 2446,
+        "tool_ms": 0,
+        "llm_rounds": 1,
+        "prompt_tokens": 3158,
+        "completion_tokens": 60
+      }
+    },
+    {
+      "q": "E02 hata kodu ne anlama geliyor?",
+      "lang": "tr",
+      "expect": [
+        "ısın"
+      ],
+      "answer": "E02 hata kodu, motorların aşırı ısındığını gösterir. Bu durumda robotu 15 dakika dinlendirin.",
+      "tools": [],
+      "checks": {
+        "fact": true,
+        "language": true
+      },
+      "ok": true,
+      "ms": 9553,
+      "ungrounded_numbers": [],
+      "metrics": {
+        "total_ms": 9549,
+        "retrieval_ms": 12.0,
+        "llm_ttft_ms": 2394,
+        "tool_ms": 0,
+        "llm_rounds": 1,
+        "prompt_tokens": 3157,
+        "completion_tokens": 38
+      }
+    },
+    {
+      "q": "Robot kiralayabilir miyim?",
+      "lang": "tr",
+      "expect": [
+        "3 ay",
+        "üç ay"
+      ],
+      "answer": "Evet. Rehber R2, Taşıyıcı T5 ve Temizlik C3 aylık olarak kiralanabilir. En kısa kiralama süresi 3 aydır.",
+      "tools": [],
+      "checks": {
+        "fact": true,
+        "language": true
+      },
+      "ok": true,
+      "ms": 10422,
+      "ungrounded_numbers": [],
+      "metrics": {
+        "total_ms": 10418,
+        "retrieval_ms": 11.9,
+        "llm_ttft_ms": 2433,
+        "tool_ms": 0,
+        "llm_rounds": 1,
+        "prompt_tokens": 3158,
+        "completion_tokens": 43
+      }
+    },
+    {
+      "q": "Destek hattı hangi saatlerde açık?",
+      "lang": "tr",
+      "expect": [
+        "09",
+        "9",
+        "dokuz"
+      ],
+      "answer": "Bir saniye, kontrol ediyorum. Destek hattı hafta içi 09:00 ile 18:00 arasında, Cumartesi günleri 10:00 ile 14:00 arasında hizmet verir.",
+      "tools": [
+        "get_current_datetime"
+      ],
+      "checks": {
+        "fact": true,
+        "language": true
+      },
+      "ok": true,
+      "ms": 18763,
+      "ungrounded_numbers": [],
+      "metrics": {
+        "total_ms": 18759,
+        "retrieval_ms": 12.7,
+        "llm_ttft_ms": 9191,
+        "tool_ms": 15,
+        "llm_rounds": 2,
+        "prompt_tokens": 6402,
+        "completion_tokens": 68
+      }
+    },
+    {
+      "q": "Nova Robotik ne zaman kuruldu?",
+      "lang": "tr",
+      "expect": [
+        "2016"
+      ],
+      "answer": "Nova Robotik, 2016 yılında Eskişehir'de kurulmuş bir hizmet robotları üreticisidir.",
+      "tools": [],
+      "checks": {
+        "fact": true,
+        "language": true
+      },
+      "ok": true,
+      "ms": 8055,
+      "ungrounded_numbers": [],
+      "metrics": {
+        "total_ms": 8051,
+        "retrieval_ms": 35.2,
+        "llm_ttft_ms": 2361,
+        "tool_ms": 0,
+        "llm_rounds": 1,
+        "prompt_tokens": 3157,
+        "completion_tokens": 31
+      }
+    },
+    {
+      "q": "1003 numaralı siparişim ne durumda?",
+      "lang": "tr",
+      "tool": "get_order_status",
+      "expect": [
+        "kargo",
+        "yolda"
+      ],
+      "answer": "Siparişünüzün durumu şu şekildedir: Kargoya verildi, yolda. Teslimatın tahmini tarihi: 2026-10-12.",
+      "tools": [
+        "get_order_status"
+      ],
+      "checks": {
+        "fact": true,
+        "tool": true,
+        "language": true
+      },
+      "ok": true,
+      "ms": 17036,
+      "ungrounded_numbers": [],
+      "metrics": {
+        "total_ms": 17032,
+        "retrieval_ms": 42.1,
+        "llm_ttft_ms": 7865,
+        "tool_ms": 42,
+        "llm_rounds": 1,
+        "prompt_tokens": 3286,
+        "completion_tokens": 48
+      }
+    },
+    {
+      "q": "Taşıyıcı T5'in fiyatı ne kadar?",
+      "lang": "tr",
+      "tool": "get_product_info",
+      "expect": [
+        "890"
+      ],
+      "answer": "Taşıyıcı T5'in fiyatı 890.00 TL'dir. (VAT dahil değil)",
+      "tools": [
+        "get_product_info"
+      ],
+      "checks": {
+        "fact": true,
+        "tool": true,
+        "language": true
+      },
+      "ok": true,
+      "ms": 10468,
+      "ungrounded_numbers": [
+        "89000"
+      ],
+      "metrics": {
+        "total_ms": 10464,
+        "retrieval_ms": 47.7,
+        "llm_ttft_ms": 5421,
+        "tool_ms": 6,
+        "llm_rounds": 1,
+        "prompt_tokens": 3236,
+        "completion_tokens": 27
+      }
+    },
+    {
+      "q": "İzmir'de servis merkeziniz var mı?",
+      "lang": "tr",
+      "tool": "find_service_center",
+      "expect": [
+        "Çiğli",
+        "0232"
+      ],
+      "answer": "Bir saniye, kontrol ediyorum. Evet, İzmir'de servis merkezimiz var. Adres: Atatürk OSB, 10003 Sokak No: 15, Çiğli. Telefon: 0232 555 40 40.",
+      "tools": [
+        "find_service_center",
+        "find_service_center"
+      ],
+      "checks": {
+        "fact": true,
+        "tool": true,
+        "language": true
+      },
+      "ok": true,
+      "ms": 25562,
+      "ungrounded_numbers": [],
+      "metrics": {
+        "total_ms": 25559,
+        "retrieval_ms": 36.6,
+        "llm_ttft_ms": 13852,
+        "tool_ms": 45,
+        "llm_rounds": 2,
+        "prompt_tokens": 6583,
+        "completion_tokens": 83
+      }
+    },
+    {
+      "q": "Ankara'da hava nasıl?",
+      "lang": "tr",
+      "tool": "get_weather",
+      "answer": "Ankara'daki hava açık ve 12 dereceden 23 dereceye kadar değişmektedir. Sıcaklık 9 dereceye düşüktür.",
+      "tools": [
+        "get_weather"
+      ],
+      "checks": {
+        "tool": true,
+        "language": true
+      },
+      "ok": true,
+      "ms": 15669,
+      "ungrounded_numbers": [],
+      "metrics": {
+        "total_ms": 15665,
+        "retrieval_ms": 683.3,
+        "llm_ttft_ms": 5672,
+        "tool_ms": 683,
+        "llm_rounds": 1,
+        "prompt_tokens": 3254,
+        "completion_tokens": 42
+      }
+    },
+    {
+      "q": "Türkiye'nin başkenti neresi?",
+      "lang": "tr",
+      "refuse": true,
+      "answer": "Türkiye'nin başkenti Ankara'dır.",
+      "tools": [],
+      "checks": {
+        "refusal": false,
+        "language": true
+      },
+      "ok": false,
+      "ms": 4682,
+      "ungrounded_numbers": [],
+      "metrics": {
+        "total_ms": 4679,
+        "retrieval_ms": 24.4,
+        "llm_ttft_ms": 2351,
+        "tool_ms": 0,
+        "llm_rounds": 1,
+        "prompt_tokens": 3155,
+        "completion_tokens": 11
+      }
+    },
+    {
+      "q": "Temizlik C3 kaç kilogram?",
+      "lang": "tr",
+      "refuse": true,
+      "answer": "Temizlik C3 taşıma kapasitesi 150 kilogramdır.",
+      "tools": [],
+      "checks": {
+        "refusal": false,
+        "language": true
+      },
+      "ok": false,
+      "ms": 6489,
+      "ungrounded_numbers": [],
+      "metrics": {
+        "total_ms": 6485,
+        "retrieval_ms": 33.6,
+        "llm_ttft_ms": 2316,
+        "tool_ms": 0,
+        "llm_rounds": 1,
+        "prompt_tokens": 3154,
+        "completion_tokens": 20
+      }
+    },
+    {
+      "q": "Şirketin genel müdürü kim?",
+      "lang": "tr",
+      "refuse": true,
+      "answer": "Nova Robotik A.Ş., 2016 yılında Eskişehir'de kurulmuş bir hizmet robotları üreticisidir. Şirketin genel müdürü hakkında bilgi verilen konuda bulunamadı.",
+      "tools": [],
+      "checks": {
+        "refusal": true,
+        "language": true
+      },
+      "ok": true,
+      "ms": 11663,
+      "ungrounded_numbers": [],
+      "metrics": {
+        "total_ms": 11659,
+        "retrieval_ms": 29.6,
+        "llm_ttft_ms": 2131,
+        "tool_ms": 0,
+        "llm_rounds": 1,
+        "prompt_tokens": 3154,
+        "completion_tokens": 54
+      }
+    },
+    {
+      "q": "What is the battery life of Taşıyıcı T5?",
+      "lang": "en",
+      "expect": [
+        "10",
+        "ten"
+      ],
+      "answer": "One moment, let me check. The battery life of Taşıyıcı T5 is 10 hours. However, it currently has no stock available.",
+      "tools": [
+        "get_product_info"
+      ],
+      "checks": {
+        "fact": true,
+        "language": true
+      },
+      "ok": true,
+      "ms": 15639,
+      "ungrounded_numbers": [],
+      "metrics": {
+        "total_ms": 15635,
+        "retrieval_ms": 32.4,
+        "llm_ttft_ms": 11151,
+        "tool_ms": 6,
+        "llm_rounds": 2,
+        "prompt_tokens": 6408,
+        "completion_tokens": 52
+      }
+    },
+    {
+      "q": "Can I return a robot after it has been installed?",
+      "lang": "en",
+      "expect": [
+        "not",
+        "cannot",
+        "can't"
+      ],
+      "answer": "Yes, if a robot has been installed and commissioned on site, it cannot be returned, but is covered by the warranty. Warranty repairs are typically completed within 10 business days.",
+      "tools": [],
+      "checks": {
+        "fact": true,
+        "language": true
+      },
+      "ok": true,
+      "ms": 9719,
+      "ungrounded_numbers": [],
+      "metrics": {
+        "total_ms": 9715,
+        "retrieval_ms": 30.2,
+        "llm_ttft_ms": 2473,
+        "tool_ms": 0,
+        "llm_rounds": 1,
+        "prompt_tokens": 3160,
+        "completion_tokens": 38
+      }
+    },
+    {
+      "q": "How often should preventive maintenance be done?",
+      "lang": "en",
+      "expect": [
+        "6",
+        "six"
+      ],
+      "answer": "Every robot should receive preventive maintenance every 6 months.",
+      "tools": [],
+      "checks": {
+        "fact": true,
+        "language": true
+      },
+      "ok": true,
+      "ms": 3977,
+      "ungrounded_numbers": [],
+      "metrics": {
+        "total_ms": 3973,
+        "retrieval_ms": 15.9,
+        "llm_ttft_ms": 1991,
+        "tool_ms": 0,
+        "llm_rounds": 1,
+        "prompt_tokens": 3152,
+        "completion_tokens": 12
+      }
+    },
+    {
+      "q": "How much does the education kit cost?",
+      "lang": "en",
+      "tool": "get_product_info",
+      "expect": [
+        "18,500",
+        "18500",
+        "18.500"
+      ],
+      "answer": "The education kit for the Education E1 costs 18,500 Turkish Liras.",
+      "tools": [
+        "get_product_info"
+      ],
+      "checks": {
+        "fact": true,
+        "tool": true,
+        "language": true
+      },
+      "ok": true,
+      "ms": 8176,
+      "ungrounded_numbers": [],
+      "metrics": {
+        "total_ms": 8172,
+        "retrieval_ms": 45.4,
+        "llm_ttft_ms": 4559,
+        "tool_ms": 6,
+        "llm_rounds": 1,
+        "prompt_tokens": 3232,
+        "completion_tokens": 21
+      }
+    },
+    {
+      "q": "What is the status of order 1002?",
+      "lang": "en",
+      "tool": "get_order_status",
+      "expect": [
+        "production"
+      ],
+      "answer": "The order 1002 for the Taşıyıcı T5 is currently in production. The estimated delivery date is October 27, 2026.",
+      "tools": [
+        "get_order_status"
+      ],
+      "checks": {
+        "fact": true,
+        "tool": true,
+        "language": true
+      },
+      "ok": true,
+      "ms": 14834,
+      "ungrounded_numbers": [],
+      "metrics": {
+        "total_ms": 14831,
+        "retrieval_ms": 51.8,
+        "llm_ttft_ms": 7282,
+        "tool_ms": 52,
+        "llm_rounds": 1,
+        "prompt_tokens": 3272,
+        "completion_tokens": 37
+      }
+    },
+    {
+      "q": "What time is it now?",
+      "lang": "en",
+      "tool": "get_current_datetime",
+      "answer": "The current time is 22:32 on Friday.",
+      "tools": [
+        "get_current_datetime"
+      ],
+      "checks": {
+        "tool": true,
+        "language": true
+      },
+      "ok": true,
+      "ms": 6391,
+      "ungrounded_numbers": [],
+      "metrics": {
+        "total_ms": 6387,
+        "retrieval_ms": 12.6,
+        "llm_ttft_ms": 3888,
+        "tool_ms": 5,
+        "llm_rounds": 1,
+        "prompt_tokens": 3223,
+        "completion_tokens": 14
+      }
+    },
+    {
+      "q": "Who won the last football World Cup?",
+      "lang": "en",
+      "refuse": true,
+      "answer": "I don't have information about the winner of the last football World Cup. I can help with questions related to Nova Robotik products, warranty, service, orders, prices, weather, and live data.",
+      "tools": [],
+      "checks": {
+        "refusal": true,
+        "language": true
+      },
+      "ok": true,
+      "ms": 9736,
+      "ungrounded_numbers": [],
+      "metrics": {
+        "total_ms": 9732,
+        "retrieval_ms": 15.6,
+        "llm_ttft_ms": 1890,
+        "tool_ms": 0,
+        "llm_rounds": 1,
+        "prompt_tokens": 3161,
+        "completion_tokens": 42
+      }
+    },
+    {
+      "q": "How much does the Rehber R2 robot weigh and how tall is it?",
+      "lang": "en",
+      "expect": [
+        "68",
+        "1.65",
+        "1,65"
+      ],
+      "answer": "One moment, let me check. The Rehber R2 robot weighs 68 kilograms and is 1.65 meters tall. It's available in stock and will be delivered in 5 business days.",
+      "tools": [
+        "get_product_info"
+      ],
+      "checks": {
+        "fact": true,
+        "language": true
+      },
+      "ok": true,
+      "ms": 19388,
+      "ungrounded_numbers": [],
+      "metrics": {
+        "total_ms": 19385,
+        "retrieval_ms": 42.7,
+        "llm_ttft_ms": 12220,
+        "tool_ms": 6,
+        "llm_rounds": 2,
+        "prompt_tokens": 6424,
+        "completion_tokens": 63
+      }
+    }
+  ]
+}

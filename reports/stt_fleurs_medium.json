@@ -1,0 +1,15 @@
+{
+  "n_per_language": 15,
+  "results": [
+    {
+      "model": "medium",
+      "variant": "dynamic",
+      "tr": {
+        "wer": 0.237,
+        "lang_id": "15/15",
+        "rtf": 0.991,
+        "ms_per_utt": 11839
+      }
+    }
+  ]
+}

@@ -23,6 +23,14 @@ Mikrofon ─► VAD (Silero) ─► STT (Whisper) ─► Ajan: RAG + araçlar + 
 Docker Desktop (Windows/WSL2) AMD GPU'yu konteynere geçirmediği için GPU'yu yalnızca **bilgisayarda kurulu Ollama**
 kullanabilir.
 
+```bash
+git clone https://github.com/AbdullahKarakoc/akinrobotics-nova-voice-agent.git
+cd akinrobotics-nova-voice-agent
+```
+
+`.env` gerekmez: API anahtarı yoktur, tüm ayarların varsayılanı vardır ([.env.example](.env.example) yalnızca
+değiştirmek için şablondur). Modeller ve SQLite veritabanı (`data/seed.sql`'den) ilk açılışta otomatik oluşturulur.
+
 | Kurulum | LLM | Nerede | İlk ses (bu dizüstü, p50) |
 |---|---|---|---|
 | **A. GPU (önerilen)** | Qwen3-4B-Instruct-2507, 4-bit IQ4_XS (2.1 GB) | Bilgisayardaki Ollama, ekran kartı (%90 GPU) | **~6 sn** |
@@ -69,6 +77,7 @@ tekrar basmaya gerek yok; "Dinlemeyi durdur" mikrofonu duraklatır). Hazır oldu
 ```bash
 python -m venv .venv && .venv/Scripts/activate      # Linux/macOS: source .venv/bin/activate
 pip install -r requirements-dev.txt
+cp .env.example .env                                # ayar şablonu (gizli bilgi içermez; isteğe bağlı)
 # Ollama kurulu ve açık olmalı (https://ollama.com); LLM'i ajan ilk açılışta kendisi indirtir.
 # Model .env'deki LLM_MODEL: GPU'da hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:IQ4_XS önerilir.
 python -m scripts.download_models                   # Whisper, Piper sesleri, embedding modeli

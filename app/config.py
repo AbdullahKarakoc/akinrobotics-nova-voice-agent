@@ -57,9 +57,9 @@ class Settings(BaseSettings):
     llm_backend: str = "ollama"  # "ollama" (native API) or "openai" (any OpenAI-compatible server)
     llm_base_url: str = "http://localhost:11434"
     llm_api_key: str = ""
-    # Explicit 4-bit (Q4_K_M) tag: ~1.3 GB instead of ~3.4 GB in fp16, and much faster on CPU.
-    # (Ollama's plain "qwen3:1.7b" points to the same Q4_K_M file; the tag makes it explicit.)
-    llm_model: str = "qwen3:1.7b-q4_K_M"
+    # Same default as .env.example and docker-compose.yml, so a fresh clone without .env behaves alike.
+    # 4-bit Q4_K_M (~2.5 GB); faster but less accurate: "qwen3:1.7b-q4_K_M" (README §4.3).
+    llm_model: str = "hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M"
     llm_temperature: float = 0.2
     llm_max_tokens: int = 200
     llm_num_ctx: int = 3072  # longest prompt ~1.0k tokens + 4 history turns; smaller KV cache = more layers on a 4 GB GPU

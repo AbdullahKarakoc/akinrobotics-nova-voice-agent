@@ -14,7 +14,7 @@ from collections.abc import AsyncIterator, Iterable
 from dataclasses import dataclass, field
 from typing import Any
 
-from app.agent.prompts import ERROR_REPLIES, TOOL_FILLERS, build_system_prompt, build_user_message
+from app.agent.prompts import ERROR_REPLIES, NOT_READY_REPLIES, TOOL_FILLERS, build_system_prompt, build_user_message
 from app.agent.speech_text import ungrounded_numbers
 from app.config import Settings
 from app.knowledge import Hit, Retriever
@@ -129,6 +129,8 @@ class Agent:
         self.system_prompt = build_system_prompt(retriever.chunks if self.full_knowledge else None)
         self.knowledge_text = " ".join(c.full_text for c in retriever.chunks)
         self.chunk_labels = {c.id: f"K{i}" for i, c in enumerate(retriever.chunks, 1)}
+        # "starting" -> "downloading" (first start only) -> "loading" -> "ready"; set by main._warmup.
+        self.llm_status = "starting"
 
     async def warmup(self) -> None:
         """Load the model and prime the server's prompt cache with the static system prompt + tools."""
@@ -154,6 +156,13 @@ class Agent:
     async def respond(self, question: str, language: str, conversation: Conversation, turn: AgentTurn) -> AsyncIterator[str]:
         """Yield the answer as text deltas; fills `turn` with sources and metrics."""
         start = time.perf_counter()
+        if self.llm_status != "ready":
+            log.warning("llm not ready, question not answered", extra={"data": {"llm_status": self.llm_status}})
+            turn.error = f"llm {self.llm_status}"
+            turn.spoken = NOT_READY_REPLIES.get(language, NOT_READY_REPLIES["tr"])
+            turn.total_ms = (time.perf_counter() - start) * 1000
+            yield turn.spoken
+            return
         routed = self.tools.route(question)
         retrieval = asyncio.create_task(asyncio.to_thread(self._retrieve, question, conversation))
         if routed:

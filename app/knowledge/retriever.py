@@ -3,7 +3,7 @@
 * Dense: multilingual sentence embeddings (fastembed / ONNX, no PyTorch), so a
   Turkish question can match an English document and vice versa.
 * Lexical: BM25 with Turkish-aware tokenisation; catches exact names and codes
-  ("T5", "NR-1003") that embeddings blur.
+  ("T5", "E02") that embeddings blur.
 * A relevance threshold turns "nothing relevant" into an explicit empty result,
   which the agent uses to refuse instead of guessing.
 

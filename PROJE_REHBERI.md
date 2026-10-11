@@ -207,7 +207,7 @@ akınRobotics/
 │   └── seed.sql              ← örnek veritabanı (ürün, sipariş, servis merkezi)
 ├── eval/questions.json       ← 26 soruluk değerlendirme seti
 ├── scripts/                  ← model indirme, değerlendirme, benchmark'lar
-├── tests/                    ← 40 birim testi
+├── tests/                    ← 41 birim testi
 ├── reports/                  ← ölçüm sonuçları (JSON)
 ├── models/                   ← indirilen modeller (git'e girmez)
 ├── Dockerfile, docker-compose.yml, docker-compose.host-ollama.yml
@@ -224,7 +224,7 @@ başka bir TTS koymak, sadece yeni bir sınıf yazıp fabrikaya bir satır eklem
 
 ## 5. Bir konuşma turunun yolculuğu (kod üzerinden)
 
-Kullanıcı "1003 numaralı siparişim ne durumda?" diyor. Kodu takip edelim:
+Kullanıcı "340 numaralı siparişim ne durumda?" diyor. Kodu takip edelim:
 
 1. **Mikrofon → 16 kHz PCM** — `web/pcm-worklet.js`, `PcmCapture.process()`: her 128 örneklik tarayıcı bloğunu
    alçak geçiren filtreden geçirir, 16 kHz'e indirir, 1024 örnek (64 ms) dolunca ana iş parçacığına yollar.
@@ -236,11 +236,11 @@ Kullanıcı "1003 numaralı siparişim ne durumda?" diyor. Kodu takip edelim:
    500 ms sessizlik → `SPEECH_END` olayı (içinde ifadenin tüm sesi).
 5. **Tur başlatma** — `VoiceSession._start_turn()` bir `asyncio.Task` olarak `_run_turn()`'ü başlatır.
 6. **STT** — `_run_turn()`, `FasterWhisperSTT.transcribe()`'ı ayrı iş parçacığında çalıştırır →
-   `Transcript(text="1003 numaralı siparişim ne durumda?", language="tr")`. Ardından `fix_domain_terms()`.
+   `Transcript(text="340 numaralı siparişim ne durumda?", language="tr")`. Ardından `fix_domain_terms()`.
    İstemciye `{"type": "transcript", ...}` gider (ekranda kullanıcı balonu belirir).
 7. **Ajan** — `Agent.respond()` (`app/agent/agent.py`):
-   * `self.tools.route(question)` → `route_order` "sipariş" kelimesini ve "1003"ü görür →
-     `ToolCall(get_order_status, {"order_number": "1003"})`. Araç **hemen** çalıştırılır (`ToolRegistry.execute`).
+   * `self.tools.route(question)` → `route_order` "sipariş" kelimesini ve "340"ı görür →
+     `ToolCall(get_order_status, {"order_number": "340"})`. Araç **hemen** çalıştırılır (`ToolRegistry.execute`).
    * Paralelde `_retrieve()` → hibrit arama (bu soru için alakalı doküman çıkmayabilir).
    * `build_user_message()` → `CONTEXT: ...`, `LIVE DATA: get_order_status(...): {"status_tr": "kargoya verildi, yolda", ...}`,
      `USER: ...`, `(Yalnızca Türkçe cevap ver.)`.
@@ -294,11 +294,13 @@ Kullanıcı "1003 numaralı siparişim ne durumda?" diyor. Kodu takip edelim:
 
 * `lifespan`: FastAPI açılırken `build_services`'i **ayrı iş parçacığında** çalıştırır (modeller yüklenirken olay
   döngüsü donmasın), ardından `_warmup()` görevini başlatır.
-* `_warmup()`: önce `ensure_model()` ile model Ollama'da var mı bakar (`/api/show`), yoksa indirtir (`/api/pull`) —
+* `_warmup()`: önce `has_model()` ile model Ollama'da var mı bakar (`/api/show`), yoksa `pull_model()` ile indirtir —
   ana makinedeki Ollama'yı kullanan GPU kurulumunda elle `ollama pull` gerekmez. Sonra LLM'e sistem promptuyla küçük
   bir istek atar → model belleğe yüklenir ve **sistem promptu KV önbelleğine girer**. LLM sunucusu henüz hazır değilse (Docker'da model iniyor olabilir) 10 sn arayla 60 kez dener.
-  Başarınca `state["llm_ready"] = True`.
-* Uç noktalar: `GET /` (arayüz), `GET /health` (sağlık + `llm_ready`), `GET /api/metrics` (tüm turların istatistiği),
+  İlerlemeyi `agent.llm_status`'a yazar (`starting` → `downloading` → `loading` → `ready`); `ready` olana kadar ajan
+  LLM'i çağırmaz, "dil modelim henüz hazır değil" der (`NOT_READY_REPLIES`). İndirme başlangıcı, hazır olma ve
+  hatalar Docker çıktısında gözden kaçmasın diye `logging_setup.banner()` ile çerçeveli yazılır.
+* Uç noktalar: `GET /` (arayüz), `GET /health` (sağlık + `llm_ready`, `llm_status`), `GET /api/metrics` (tüm turların istatistiği),
   `WS /ws` (sesli oturum), `POST /api/chat` (metinle aynı ajan — değerlendirme betiği bunu kullanır).
 * `/api/chat` konuşma geçmişini `session_id` ile `OrderedDict` içinde tutar; en fazla 100 oturum (LRU mantığı:
   `move_to_end` + en eskiyi at).
@@ -382,7 +384,8 @@ ve testlerde görülen "Rehber ve iki", "Zehbe Z2", "Vehbar ve iki", "Heddar ve 
 * Akış **NDJSON**: her satır bir JSON; `message.content` → `TextDelta`, `message.tool_calls` → toplanır, `done: true`
   satırındaki `prompt_eval_duration`/`eval_duration` (nanosaniye) → `LLMStats`.
 * `_to_wire()`: Ollama araç argümanlarını sözlük ister; araç sonucu mesajında `tool_name` bekler.
-* `ensure_model()`: `/api/show` 404 dönerse `/api/pull` ile modeli indirtir (açılışta `_warmup` çağırır).
+* `has_model()` / `pull_model()`: `/api/show` 404 dönerse `_warmup` modeli `/api/pull` ile indirtir. İndirme akış
+  olarak okunur ve ilerleme %10'luk adımlarla loglanır (`llm download 40% (908 / 2270 MB)`).
   `hf.co/<kullanıcı>/<repo>:<kuantizasyon>` biçimindeki adlarla Hugging Face'teki GGUF dosyaları da doğrudan çekilebilir.
 * `keep_alive="30m"`: model 30 dk boşta kalsa da bellekte tutulur (her istekte yeniden yükleme olmasın).
 
@@ -450,22 +453,25 @@ ve testlerde görülen "Rehber ve iki", "Zehbe Z2", "Vehbar ve iki", "Heddar ve 
 
 | Araç | Nereden | Hangi soruda (yönlendirici) | Örnek |
 |---|---|---|---|
-| `get_order_status` | SQLite | "sipariş" + 3-7 haneli no | "1003 numaralı siparişim ne durumda?" |
+| `get_order_status` | SQLite | "sipariş" + 3-7 haneli no | "340 numaralı siparişim ne durumda?" |
 | `get_product_info` | SQLite | fiyat/stok/satın alma kelimesi + ürün | "Taşıyıcı T5'in fiyatı ne kadar?" |
 | `find_service_center` | SQLite | "servis/tamir" + şehir | "İzmir'de servis merkeziniz var mı?" |
 | `get_weather` | Open-Meteo | hava kelimesi + şehir | "Ankara'da hava nasıl?" |
 | `get_current_datetime` | sistem saati | "saat kaç / bugün günlerden ne" | "Saat kaç?" |
-| `check_warranty` | MCP Nova Servis | 5 haneli seri no + "garanti/bakım" | "21507 seri numaralı robotumun garantisi devam ediyor mu?" |
-| `get_robot_diagnostics` | MCP Nova Servis | 5 haneli seri no + "çalışmıyor/hata/şarj/ne durumda" | "24012 numaralı robotum çalışmıyor." |
-| `get_service_ticket_status` | MCP Nova Servis | 4 haneli no + "talep/kayıt/ticket" | "5003 numaralı servis talebim ne durumda?" |
+| `check_warranty` | MCP Nova Servis | 4 haneli seri no + "garanti/bakım" | "4500 seri numaralı robotumun garantisi devam ediyor mu?" |
+| `get_robot_diagnostics` | MCP Nova Servis | 4 haneli seri no + "çalışmıyor/hata/şarj/ne durumda" | "3200 numaralı robotum çalışmıyor." |
+| `get_service_ticket_status` | MCP Nova Servis | 2 haneli no + "talep/kayıt/ticket" | "37 numaralı servis talebim ne durumda?" |
 | `wikipedia_tr_get_summary` | MCP wikipedia-mcp | Türkçe "nedir/ne demek" + sözlük terimi | "LiDAR nedir?" |
 | `wikipedia_en_get_summary` | MCP wikipedia-mcp | İngilizce "what is" + sözlük terimi, ya da TR maddesi olmayan terim | "What is a humanoid robot?", "SLAM nedir?" |
 
 Araç **çağrılmayan** sorular da önemli: "Rehber R2'nin pil ömrü ne kadar?" ve "Garanti süresi ne kadar?" bilgi
 sorusu, dokümandan cevaplanır. "Siparişim ne durumda?" (numara yok) sorusunda yönlendirici çalışmaz, LLM numarayı
 sorar. "Rehber R2'nin sensörleri nedir?" bizim ürünümüz olduğu için Wikipedia'ya değil dokümana gider.
-Uzunluklarına göre ayrılan numaralar (seri no 5, sipariş ve talep 4 hane) ve niyet kelimeleri yönlendiricileri
-birbirinden ayırır.
+Uzunluklarına göre ayrılan numaralar (seri no 4, sipariş 3, servis talebi 2 hane) ve niyet kelimeleri
+yönlendiricileri birbirinden ayırır. Numaralar bilerek kısa ve söylemesi kolay seçildi ("üç yüz kırk",
+"dört bin beş yüz", "yirmi altı"): "bin üç", "beş bin üç", "yirmi bir bin beş yüz yedi" gibi eski numaraları
+konuşma tanıma sık yanlış yazıyordu. `spoken_serial()` yıl gibi görünen sayıları (1900-2099) ve "sipariş" geçen
+soruları seri numarası saymaz.
 
 **`registry.py`:**
 * `Tool(name, description, parameters, required, handler, router)` ve `schema()` → LLM'e verilen JSON şema.
@@ -489,7 +495,7 @@ birbirinden ayırır.
 * Bağlantı **salt okunur** açılır (`mode=ro`) — LLM'in tetiklediği araçlar veriyi değiştiremez.
 * `match_product()`: kod ("T5"), ad ("Taşıyıcı T5"), takma ad ("cleaning" → C3), son çare `difflib` bulanık eşleşme.
 * Araçlar ve yönlendiricileri:
-  * `get_order_status` ← "sipariş/order" + 3-7 haneli sayı. "1.003", "NR-1003", "1 003" hepsi 1003'e çevrilir
+  * `get_order_status` ← "sipariş/order" + 3-7 haneli sayı. "340", "NR-340", "3 40" hepsi 340'a çevrilir
     (konuşmadan gelen sayı biçimleri tutarsız).
   * `get_product_info` ← "fiyat/ücret/stok/price/cost/..." + ürün adı. ("How much does R2 **weigh**" tetiklemez.)
   * `find_service_center` ← "servis/service center" + şehir.
@@ -508,8 +514,8 @@ birbirinden ayırır.
   Proactor döngüsü açıkça seçilir. Çağrılar `run_coroutine_threadsafe` ile o döngüye gönderilir.
 * `register()`: `tools/list` ile araçları keşfeder, şemadaki pydantic `title` alanlarını atar (gereksiz prompt
   token'ı), aracı yerel araçlarla aynı `Tool` olarak ekler. Sunucu açılamazsa uyarı loglanır ve atlanır.
-* `ROUTERS`: MCP araçlarının deterministik yönlendiricileri **ajan tarafında**, araç adına göre. Seri no 5 hane,
-  talep no 4 hane. Türkçe ünsüz yumuşamasına dikkat: "talep" → "talebim" (`tale[pb]`).
+* `ROUTERS`: MCP araçlarının deterministik yönlendiricileri **ajan tarafında**, araç adına göre. Seri no 4 hane
+  (yıllar hariç), talep no 2 hane. Türkçe ünsüz yumuşamasına dikkat: "talep" → "talebim" (`tale[pb]`).
 * Sunucu başına ayar (`MCPServerConfig`, `app/config.py`): `tools` (araç filtresi), `prefix` (aynı sunucunun iki
   örneği için ad öneki), `llm_visible` (false: yalnızca router çağırır, şema LLM'e gitmez), `max_chars` (uzun
   metinleri cümle sonundan kısaltır). Sunucular paralel başlatılır.
@@ -672,7 +678,7 @@ Ankara" bir ret değildir), `tool` (çağrılması gereken araç). Canlı kullan
 | `benchmark_stt.py` | FLEURS gerçek insan sesiyle WER/RTF; standart vs. bizim çözümleme; `--models`, `--variants`, `--langs`, `--threads`, `--beam` | tar.gz'yi **akışla** okuyup ilk N kaydı alır (750 MB indirmeden) |
 | `report_table.py` | `reports/eval_*.json` → README tablosu | — |
 
-### 6.17 `tests/` — 40 birim testi (model gerektirmez, ~10 sn)
+### 6.17 `tests/` — 41 birim testi (model gerektirmez, ~10 sn)
 
 | Dosya | Test ettiği | Teknik |
 |---|---|---|

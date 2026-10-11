@@ -64,7 +64,7 @@ def register(registry: ToolRegistry, db_path: Path) -> None:
     @registry.tool(
         "get_order_status",
         "Look up the status and estimated delivery date of a customer order by its order number.",
-        {"order_number": {"type": "string", "description": "Order number, e.g. 1002"}},
+        {"order_number": {"type": "string", "description": "Order number, e.g. 250"}},
         router=route_order,
     )
     def get_order_status(order_number: str) -> dict:

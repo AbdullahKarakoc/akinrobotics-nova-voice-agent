@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from collections.abc import AsyncIterator
 from typing import Any
@@ -10,6 +11,8 @@ from typing import Any
 import httpx
 
 from app.llm.base import Done, LLMEvent, LLMStats, TextDelta, ToolCall, ToolCalls
+
+log = logging.getLogger(__name__)
 
 
 class OllamaLLM:
@@ -97,13 +100,31 @@ class OllamaLLM:
                     )
                     return
 
-    async def ensure_model(self) -> bool:
-        """Pull the model if the server doesn't have it (e.g. a host Ollama). Returns True if it pulled."""
-        if (await self.client.post("/api/show", json={"model": self.model})).status_code != 404:
-            return False
-        resp = await self.client.post("/api/pull", json={"model": self.model, "stream": False}, timeout=None)
-        resp.raise_for_status()
-        return True
+    async def has_model(self) -> bool:
+        return (await self.client.post("/api/show", json={"model": self.model})).status_code != 404
+
+    async def pull_model(self) -> None:
+        """Pull the model into the server (e.g. a host Ollama), logging progress every 10%."""
+        logged: dict[str, int] = {}
+        async with self.client.stream("POST", "/api/pull", json={"model": self.model}, timeout=None) as resp:
+            resp.raise_for_status()
+            async for line in resp.aiter_lines():
+                if not line.strip():
+                    continue
+                chunk = json.loads(line)
+                if "error" in chunk:
+                    raise RuntimeError(f"Ollama pull error: {chunk['error']}")
+                total, done = chunk.get("total") or 0, chunk.get("completed") or 0
+                if total < 50_000_000:  # only the weights layer is worth reporting
+                    continue
+                percent = done * 100 // total
+                digest = chunk.get("digest", "")
+                if percent // 10 > logged.get(digest, -1):
+                    logged[digest] = percent // 10
+                    log.info(
+                        "llm download %d%% (%d / %d MB)", percent, done // 1_000_000, total // 1_000_000,
+                        extra={"data": {"model": self.model}},
+                    )
 
     async def aclose(self) -> None:
         await self.client.aclose()

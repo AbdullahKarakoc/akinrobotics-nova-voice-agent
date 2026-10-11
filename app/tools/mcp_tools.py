@@ -32,8 +32,9 @@ from app.tools.routing import mentions
 log = logging.getLogger(__name__)
 
 # ------------------------------------------------------------------ routers
-# Serial numbers have 5 digits (R2-24011), service tickets and orders 4 (5002, 1003), so the
-# number length keeps these routers apart from each other and from the order router.
+# Serial numbers have 4 digits (R2-3100), orders 3 (340) and service tickets 2 (26): all short to
+# say, so speech recognition gets them right, and the number length keeps these routers apart from
+# each other and from the order router.
 _WARRANTY = r"garanti|warrant|bakim|maintenance"
 _DIAGNOSTICS = (
     r"calismiyor|calismi|hata|ariza|sarj|batarya|\bpil\b|cevrim ?(dis|ic)|baglan|teshis|ne durumda|"
@@ -42,7 +43,7 @@ _DIAGNOSTICS = (
 
 
 def spoken_number(text: str, min_digits: int, max_digits: int) -> str | None:
-    """First number of the given length; STT may split it ('24 011', '24.011')."""
+    """First number of the given length; STT may split it ('3 100', '3.100')."""
     for m in re.finditer(r"\d[\d.\s]*\d|\d", text):
         digits = re.sub(r"\D", "", m.group())
         if min_digits <= len(digits) <= max_digits:
@@ -50,25 +51,37 @@ def spoken_number(text: str, min_digits: int, max_digits: int) -> str | None:
     return None
 
 
+def spoken_serial(text: str) -> str | None:
+    """Four digits of a serial number: 'R2 3100' -> '23100' -> '3100' (the server matches the last
+    4 digits). Years ('2026'da aldığım robot') and order questions are not serial numbers."""
+    if mentions(text, r"sipari|\border\b"):
+        return None
+    for m in re.finditer(r"\d[\d.\s]*\d|\d", text):
+        digits = re.sub(r"\D", "", m.group())
+        if 4 <= len(digits) <= 6 and not 1900 <= int(digits[-4:]) <= 2099:
+            return digits[-4:]
+    return None
+
+
 def route_warranty(text: str) -> dict | None:
-    serial = spoken_number(text, 5, 7)  # 'R2 24011' -> '224011': the server matches the last 5 digits
-    return {"serial_number": serial[-5:]} if serial and mentions(text, _WARRANTY) else None
+    serial = spoken_serial(text)
+    return {"serial_number": serial} if serial and mentions(text, _WARRANTY) else None
 
 
 def route_diagnostics(text: str) -> dict | None:
-    serial = spoken_number(text, 5, 7)
+    serial = spoken_serial(text)
     if not serial:
         return None
     # A plain "status" question is a diagnostics one unless it is about the warranty.
     if mentions(text, _DIAGNOSTICS) or (mentions(text, r"durum|status") and not mentions(text, _WARRANTY)):
-        return {"serial_number": serial[-5:]}
+        return {"serial_number": serial}
     return None
 
 
 def route_ticket(text: str) -> dict | None:
     if not mentions(text, r"tale[pb]|kayd|kayit|basvuru|ticket|request|case"):  # talep -> talebim
         return None
-    number = spoken_number(text, 4, 4)
+    number = spoken_number(text, 2, 2)
     return {"ticket_number": number} if number else None
 
 

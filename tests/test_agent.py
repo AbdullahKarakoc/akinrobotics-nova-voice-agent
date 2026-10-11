@@ -47,7 +47,9 @@ def make_agent(rounds, hits=(), mode="rag"):
         return {"found": True, "status_en": "shipped", "order_number": order_number}
 
     settings = Settings(knowledge_mode=mode)
-    return Agent(ScriptedLLM(rounds), FakeRetriever(list(hits)), registry, settings)
+    agent = Agent(ScriptedLLM(rounds), FakeRetriever(list(hits)), registry, settings)
+    agent.llm_status = "ready"
+    return agent
 
 
 async def collect(agent, question, language="tr", conversation=None):
@@ -67,6 +69,16 @@ async def test_context_is_injected_and_answer_streamed():
     assert conversation.messages[-1] == {"role": "assistant", "content": "Pil ömrü 8 saattir."}
 
 
+async def test_not_ready_llm_is_not_called_and_user_is_told_to_wait():
+    agent = make_agent([[TextDelta("hiç")]])
+    agent.llm_status = "downloading"
+    text, turn, conversation = await collect(agent, "Senin adın ne?")
+    assert "indiriliyor" in text
+    assert agent.llm.requests == []
+    assert turn.error == "llm downloading"
+    assert conversation.messages == []
+
+
 async def test_no_context_is_explicit_and_invented_numbers_are_flagged():
     agent = make_agent([[TextDelta("Pil ömrü 12 saattir.")]])
     _, turn, _ = await collect(agent, "C3 kaç kilo?")
@@ -75,9 +87,9 @@ async def test_no_context_is_explicit_and_invented_numbers_are_flagged():
 
 
 async def test_llm_tool_call_runs_tool_speaks_filler_and_feeds_result_back():
-    call = ToolCall(id="c1", name="get_order_status", arguments={"order_number": "1003"})
+    call = ToolCall(id="c1", name="get_order_status", arguments={"order_number": "340"})
     agent = make_agent([[ToolCalls([call])], [TextDelta("Siparişiniz yolda.")]])
-    text, turn, _ = await collect(agent, "siparişim nerede, numarası bin üç")
+    text, turn, _ = await collect(agent, "siparişim nerede, numarası üç yüz kırk")
     assert text == "Bir saniye, kontrol ediyorum. Siparişiniz yolda."
     second = agent.llm.requests[1]["messages"]
     assert second[-1]["role"] == "tool" and json.loads(second[-1]["content"])["status_en"] == "shipped"
@@ -85,7 +97,7 @@ async def test_llm_tool_call_runs_tool_speaks_filler_and_feeds_result_back():
 
 
 async def test_tool_call_written_as_text_is_executed_not_spoken():
-    leaked = ',{"name": "get_order_status", "arguments": {"order_number": "1003"}}'
+    leaked = ',{"name": "get_order_status", "arguments": {"order_number": "340"}}'
     agent = make_agent([[TextDelta(leaked[:20]), TextDelta(leaked[20:])], [TextDelta("Siparişiniz yolda.")]])
     text, turn, _ = await collect(agent, "siparişim nerede")
     assert "{" not in text and text.endswith("Siparişiniz yolda.")

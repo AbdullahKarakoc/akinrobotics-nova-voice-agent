@@ -50,7 +50,7 @@ def test_clean_for_speech_removes_markup_and_verbalises_units():
 def test_detect_text_language():
     assert detect_text_language("Rehber R2'nin pil ömrü ne kadar?") == "tr"
     assert detect_text_language("What is the battery life of Taşıyıcı T5?") == "en"
-    assert detect_text_language("Your order 1002 for the Taşıyıcı T5 is in production.") == "en"
+    assert detect_text_language("Your order 250 for the Taşıyıcı T5 is in production.") == "en"
     assert detect_text_language("Taşıyıcı T5'in fiyatı 890.000 TL'dir.") == "tr"
     assert detect_text_language("Merhaba") == "tr"
     assert detect_text_language("hello there", default="tr") == "en"

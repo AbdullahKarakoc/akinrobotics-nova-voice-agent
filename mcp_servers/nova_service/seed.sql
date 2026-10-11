@@ -15,7 +15,8 @@ INSERT INTO models VALUES
     ('E1', 'Eğitim E1',   12);
 
 CREATE TABLE robots (
-    serial           TEXT PRIMARY KEY,    -- model code + 5 unique digits; customers usually say the digits
+    serial           TEXT PRIMARY KEY,    -- model code + 4 unique digits (round hundreds, short to say,
+                                          -- never a year); customers usually say the digits
     model_code       TEXT NOT NULL REFERENCES models(code),
     delivered        TEXT NOT NULL,
     extended_until   TEXT,                -- extended warranty end (NULL = standard warranty only)
@@ -28,12 +29,12 @@ CREATE TABLE robots (
 );
 
 INSERT INTO robots VALUES
-    ('R2-24011', 'R2', '2026-08-04', NULL,         '2026-08-04', '3.4.1',  1, 82, '2026-10-11 09:42', NULL),
-    ('R2-24012', 'R2', '2026-08-04', NULL,         '2026-08-04', '3.4.1',  0,  4, '2026-10-10 22:15', 'E-101'),
-    ('T5-21507', 'T5', '2024-05-20', NULL,         '2025-11-18', '2.9.0',  1, 64, '2026-10-11 09:40', 'E-204'),
-    ('C3-23088', 'C3', '2025-03-10', NULL,         '2026-09-02', '1.12.3', 1, 97, '2026-10-11 09:41', NULL),
-    ('R2-22003', 'R2', '2023-11-15', '2028-11-15', '2026-05-12', '3.3.0',  1, 55, '2026-10-11 09:38', 'E-310'),
-    ('E1-25140', 'E1', '2025-09-01', NULL,         NULL,         '1.0.7',  1, 71, '2026-10-09 15:20', NULL);
+    ('R2-3100', 'R2', '2026-08-04', NULL,         '2026-08-04', '3.4.1',  1, 82, '2026-10-11 09:42', NULL),
+    ('R2-3200', 'R2', '2026-08-04', NULL,         '2026-08-04', '3.4.1',  0,  4, '2026-10-10 22:15', 'E-101'),
+    ('T5-4500', 'T5', '2024-05-20', NULL,         '2025-11-18', '2.9.0',  1, 64, '2026-10-11 09:40', 'E-204'),
+    ('C3-6800', 'C3', '2025-03-10', NULL,         '2026-09-02', '1.12.3', 1, 97, '2026-10-11 09:41', NULL),
+    ('R2-2800', 'R2', '2023-11-15', '2028-11-15', '2026-05-12', '3.3.0',  1, 55, '2026-10-11 09:38', 'E-310'),
+    ('E1-7200', 'E1', '2025-09-01', NULL,         NULL,         '1.0.7',  1, 71, '2026-10-09 15:20', NULL);
 
 CREATE TABLE error_codes (
     code      TEXT PRIMARY KEY,
@@ -70,12 +71,13 @@ CREATE TABLE tickets (
     resolution_en       TEXT
 );
 
+-- Ticket numbers have 2 digits ("yirmi altı").
 INSERT INTO tickets VALUES
-    (5001, 'T5-21507', '2026-09-28', 'resolved',            'Sol tahrik tekerleğinden ses geliyor.', 'Noise from the left drive wheel.',
-           '2026-09-30', NULL,         'Tekerlek rulmanı değiştirildi.', 'The wheel bearing was replaced.'),
-    (5002, 'R2-24012', '2026-10-10', 'technician_assigned', 'Robot şarj istasyonuna dönmüyor.',      'The robot does not return to its charging dock.',
-           '2026-10-12', '2026-10-12', NULL, NULL),
-    (5003, 'R2-22003', '2026-10-06', 'waiting_parts',       'Dokunmatik ekran yanıt vermiyor.',      'The touch screen does not respond.',
-           NULL,         '2026-10-20', NULL, NULL),
-    (5004, 'C3-23088', '2026-10-09', 'open',                'Fırça motoru ara ara duruyor.',         'The brush motor stops now and then.',
-           NULL,         NULL,         NULL, NULL);
+    (15, 'T5-4500', '2026-09-28', 'resolved',            'Sol tahrik tekerleğinden ses geliyor.', 'Noise from the left drive wheel.',
+         '2026-09-30', NULL,         'Tekerlek rulmanı değiştirildi.', 'The wheel bearing was replaced.'),
+    (26, 'R2-3200', '2026-10-10', 'technician_assigned', 'Robot şarj istasyonuna dönmüyor.',      'The robot does not return to its charging dock.',
+         '2026-10-12', '2026-10-12', NULL, NULL),
+    (37, 'R2-2800', '2026-10-06', 'waiting_parts',       'Dokunmatik ekran yanıt vermiyor.',      'The touch screen does not respond.',
+         NULL,         '2026-10-20', NULL, NULL),
+    (48, 'C3-6800', '2026-10-09', 'open',                'Fırça motoru ara ara duruyor.',         'The brush motor stops now and then.',
+         NULL,         NULL,         NULL, NULL);

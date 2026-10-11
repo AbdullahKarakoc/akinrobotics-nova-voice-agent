@@ -26,12 +26,13 @@ CREATE TABLE orders (
     eta          TEXT                   -- estimated delivery date (NULL when delivered/cancelled)
 );
 
+-- Order numbers have 3 digits that are short to say ("üç yüz kırk"), so speech recognition gets them right.
 INSERT INTO orders VALUES
-    (1001, 'Anadolu AVM',            'R2', 2,  'delivered',     '2026-08-04', NULL),
-    (1002, 'Kuzey Lojistik',         'T5', 4,  'in_production', '2026-09-15', '2026-10-27'),
-    (1003, 'Ege Üniversite Hastanesi','C3', 1,  'shipped',       '2026-10-01', '2026-10-12'),
-    (1004, 'Bilim Koleji',           'E1', 20, 'preparing',     '2026-10-07', '2026-10-16'),
-    (1005, 'Başkent Müzesi',         'R2', 1,  'cancelled',     '2026-09-20', NULL);
+    (120, 'Anadolu AVM',             'R2', 2,  'delivered',     '2026-08-04', NULL),
+    (250, 'Kuzey Lojistik',          'T5', 4,  'in_production', '2026-09-15', '2026-10-27'),
+    (340, 'Ege Üniversite Hastanesi','C3', 1,  'shipped',       '2026-10-01', '2026-10-12'),
+    (460, 'Bilim Koleji',            'E1', 20, 'preparing',     '2026-10-07', '2026-10-16'),
+    (580, 'Başkent Müzesi',          'R2', 1,  'cancelled',     '2026-09-20', NULL);
 
 CREATE TABLE service_centers (
     city    TEXT PRIMARY KEY,

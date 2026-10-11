@@ -62,14 +62,14 @@ def _digits(text: str) -> str:
 
 
 def _robot(serial_number: str) -> sqlite3.Row | None:
-    """Matches 'R2-24011', '24011', 'R2 24 011' ...: the five digits identify a robot."""
+    """Matches 'R2-3100', '3100', 'R2 3.100' ...: the four digits identify a robot."""
     digits = _digits(serial_number)
-    if len(digits) < 5:
+    if len(digits) < 4:
         return None
     rows = _query(
         "SELECT r.*, m.name AS product, m.warranty_months FROM robots r JOIN models m ON m.code = r.model_code "
-        "WHERE substr(r.serial, -5) = ?",
-        (digits[-5:],),
+        "WHERE substr(r.serial, -4) = ?",
+        (digits[-4:],),
     )
     return rows[0] if rows else None
 
@@ -78,7 +78,7 @@ def _not_found(serial_number: str) -> dict[str, Any]:
     return {"found": False, "serial_number": serial_number, "note": "No robot with this serial number exists."}
 
 
-SerialNumber = Annotated[str, Field(description="Robot serial number, e.g. R2-24011 (the 5 digits are enough)")]
+SerialNumber = Annotated[str, Field(description="Robot serial number, e.g. R2-3100 (the 4 digits are enough)")]
 
 
 @mcp.tool()
@@ -144,7 +144,7 @@ def get_robot_diagnostics(serial_number: SerialNumber) -> dict[str, Any]:
 
 @mcp.tool()
 def get_service_ticket_status(
-    ticket_number: Annotated[str, Field(description="Service request (ticket) number, e.g. 5002")],
+    ticket_number: Annotated[str, Field(description="Service request (ticket) number, e.g. 26")],
 ) -> dict[str, Any]:
     """Status of a technical service request (repair ticket) by its ticket number."""
     digits = _digits(ticket_number)

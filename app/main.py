@@ -16,7 +16,7 @@ from pydantic import BaseModel
 from app.agent import AgentTurn, Conversation
 from app.agent.speech_text import detect_text_language
 from app.config import get_settings
-from app.logging_setup import setup_logging
+from app.logging_setup import banner, setup_logging
 from app.pipeline.session import VoiceSession
 from app.services import Services, build_services
 
@@ -24,22 +24,36 @@ log = logging.getLogger("app")
 settings = get_settings()
 setup_logging(settings.log_level, settings.log_json)
 
-state: dict[str, object] = {"llm_ready": False}
-
 
 async def _warmup(services: Services) -> None:
     """Retry until the LLM server is reachable (it may still be pulling the model)."""
+    agent, llm = services.agent, services.agent.llm
     for attempt in range(60):
         try:
-            if hasattr(services.agent.llm, "ensure_model"):
-                log.info("checking llm model", extra={"data": {"model": services.agent.llm.model}})
-                if await services.agent.llm.ensure_model():
-                    log.info("llm model pulled", extra={"data": {"model": services.agent.llm.model}})
-            await services.agent.warmup()
-            state["llm_ready"] = True
+            if hasattr(llm, "has_model") and not await llm.has_model():
+                agent.llm_status = "downloading"
+                banner(
+                    log,
+                    f"LLM İNDİRİLİYOR: {llm.model}",
+                    "İlk açılışta bir kez (~2 GB). Bitene kadar ajan soru cevaplayamaz;",
+                    "ilerleme aşağıda %10'luk adımlarla yazılır.",
+                )
+                await llm.pull_model()
+                log.info("llm model pulled", extra={"data": {"model": llm.model}})
+            agent.llm_status = "loading"
+            log.info("loading llm into memory", extra={"data": {"model": llm.model}})
+            await agent.warmup()
+            agent.llm_status = "ready"
+            banner(log, "NOVA HAZIR  ->  http://localhost:8000", f"LLM: {llm.model}")
             return
         except Exception as exc:
-            log.warning("llm not ready yet", extra={"data": {"attempt": attempt + 1, "error": str(exc)[:200]}})
+            banner(
+                log,
+                f"LLM HAZIR DEĞİL (deneme {attempt + 1}/60, 10 sn sonra tekrar)",
+                f"Hata: {str(exc)[:150]}",
+                "Ollama açık mı? Model adı doğru mu? İnternet / disk alanı yeterli mi?",
+                level=logging.WARNING,
+            )
             await asyncio.sleep(10)
 
 
@@ -75,7 +89,8 @@ async def index() -> FileResponse:
 
 @app.get("/health")
 async def health() -> dict:
-    return {"status": "ok", "llm_ready": state["llm_ready"], "llm_model": settings.llm_model}
+    status = app.state.services.agent.llm_status
+    return {"status": "ok", "llm_ready": status == "ready", "llm_status": status, "llm_model": settings.llm_model}
 
 
 @app.get("/api/metrics")

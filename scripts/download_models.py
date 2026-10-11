@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from huggingface_hub import hf_hub_download  # noqa: E402
 
 from app.config import get_settings  # noqa: E402
-from app.logging_setup import setup_logging  # noqa: E402
+from app.logging_setup import banner, setup_logging  # noqa: E402
 
 log = logging.getLogger("download")
 
@@ -42,6 +42,14 @@ def main() -> None:
     setup_logging(settings.log_level)
     start = time.perf_counter()
     models = settings.models_dir
+    first_run = not (models / "embeddings").exists()
+    if first_run:
+        banner(
+            log,
+            "İLK AÇILIŞ: ses ve arama modelleri indiriliyor (~0.8 GB)",
+            "Whisper, Piper sesleri, embedding modeli. Birkaç dakika sürebilir;",
+            "bu sırada uzun süre yeni satır gelmeyebilir. Sonraki açılışlar anında.",
+        )
 
     for language in settings.languages:
         piper_voice(settings.voice_for(language), models / "piper")

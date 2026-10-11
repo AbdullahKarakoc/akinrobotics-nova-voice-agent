@@ -41,6 +41,12 @@ LANGUAGE_INSTRUCTIONS = {"tr": "(Yalnızca Türkçe cevap ver.)", "en": "(Answer
 
 TOOL_FILLERS = {"tr": "Bir saniye, kontrol ediyorum.", "en": "One moment, let me check."}
 
+# Spoken while the LLM is still being downloaded / loaded on first start (see main._warmup).
+NOT_READY_REPLIES = {
+    "tr": "Dil modelim henüz hazır değil, ilk açılışta indiriliyor. Lütfen birkaç dakika sonra tekrar deneyin.",
+    "en": "My language model isn't ready yet, it is still downloading on first start. Please try again in a few minutes.",
+}
+
 ERROR_REPLIES = {
     "tr": "Üzgünüm, şu anda bir sorun yaşıyorum. Lütfen biraz sonra tekrar deneyin.",
     "en": "Sorry, I'm having a problem right now. Please try again in a moment.",

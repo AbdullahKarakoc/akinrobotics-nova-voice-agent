@@ -51,6 +51,12 @@ class _TextFormatter(logging.Formatter):
         return line
 
 
+def banner(logger: logging.Logger, *lines: str, level: int = logging.INFO) -> None:
+    """Log a framed multi-line message: start-up milestones must stand out in `docker compose` output."""
+    rule = "=" * 64
+    logger.log(level, "\n".join(["", rule, *(f"  {line}" for line in lines), rule]))
+
+
 def setup_logging(level: str = "INFO", json_logs: bool = False) -> None:
     handler = logging.StreamHandler(sys.stdout)
     handler.addFilter(_ContextFilter())

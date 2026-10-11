@@ -27,10 +27,10 @@ async def call(reg: ToolRegistry, name: str, **args) -> dict:
 
 
 async def test_order_status_accepts_spoken_number_formats(registry):
-    for spoken in ("1003", "1.003", "NR-1003", "1 003"):
+    for spoken in ("340", "NR-340", "3 40"):
         r = await call(registry, "get_order_status", order_number=spoken)
         assert r["found"] and r["product"] == "Temizlik C3" and r["status_en"].startswith("shipped")
-    assert (await call(registry, "get_order_status", order_number="9999"))["found"] is False
+    assert (await call(registry, "get_order_status", order_number="999"))["found"] is False
 
 
 async def test_product_lookup_by_name_code_and_alias(registry):
@@ -54,7 +54,7 @@ def test_routers_fire_only_on_clear_intents(registry):
     def routed(text):
         return [(c.name, c.arguments) for c in registry.route(text)]
 
-    assert routed("1003 numaralı siparişim ne durumda?") == [("get_order_status", {"order_number": "1003"})]
+    assert routed("340 numaralı siparişim ne durumda?") == [("get_order_status", {"order_number": "340"})]
     assert routed("Taşıyıcı T5'in fiyatı ne kadar?") == [("get_product_info", {"product": "Taşıyıcı T5"})]
     assert routed("How much does the education kit cost?") == [("get_product_info", {"product": "Eğitim E1"})]
     assert routed("İzmir'de servis merkeziniz var mı?") == [("find_service_center", {"city": "İzmir"})]

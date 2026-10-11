@@ -8,7 +8,7 @@
   {"q": "Robot kiralayabilir miyim?", "lang": "tr", "expect": ["3 ay", "üç ay"]},
   {"q": "Destek hattı hangi saatlerde açık?", "lang": "tr", "expect": ["09", "9", "dokuz"]},
   {"q": "Nova Robotik ne zaman kuruldu?", "lang": "tr", "expect": ["2016"]},
-  {"q": "1003 numaralı siparişim ne durumda?", "lang": "tr", "tool": "get_order_status", "expect": ["kargo", "yolda"]},
+  {"q": "340 numaralı siparişim ne durumda?", "lang": "tr", "tool": "get_order_status", "expect": ["kargo", "yolda"]},
   {"q": "Taşıyıcı T5'in fiyatı ne kadar?", "lang": "tr", "tool": "get_product_info", "expect": ["890"]},
   {"q": "İzmir'de servis merkeziniz var mı?", "lang": "tr", "tool": "find_service_center", "expect": ["Çiğli", "0232"]},
   {"q": "Ankara'da hava nasıl?", "lang": "tr", "tool": "get_weather"},
@@ -21,7 +21,7 @@
   {"q": "Can I return a robot after it has been installed?", "lang": "en", "expect": ["not", "cannot", "can't"]},
   {"q": "How often should preventive maintenance be done?", "lang": "en", "expect": ["6", "six"]},
   {"q": "How much does the education kit cost?", "lang": "en", "tool": "get_product_info", "expect": ["18,500", "18500", "18.500"]},
-  {"q": "What is the status of order 1002?", "lang": "en", "tool": "get_order_status", "expect": ["production"]},
+  {"q": "What is the status of order 250?", "lang": "en", "tool": "get_order_status", "expect": ["production"]},
   {"q": "What time is it now?", "lang": "en", "tool": "get_current_datetime"},
   {"q": "Who won the last football World Cup?", "lang": "en", "refuse": true, "forbid": ["argentin", "france", "spain"]},
   {"q": "How much does the Rehber R2 robot weigh and how tall is it?", "lang": "en", "expect": ["68", "1.65", "1,65"]}

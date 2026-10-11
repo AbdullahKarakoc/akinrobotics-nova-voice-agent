@@ -17,60 +17,93 @@ Mikrofon ─► VAD (Silero) ─► STT (Whisper) ─► Ajan: RAG + araçlar + 
 
 ---
 
-## 1. Hızlı başlangıç (Docker)
+## 1. Kurulum
 
-İki kurulum var; ikisinde de ajan (STT, TTS, arama, araçlar) Docker'da çalışır, fark LLM'in nerede çalıştığıdır.
-Docker Desktop (Windows/WSL2) AMD GPU'yu konteynere geçirmediği için GPU'yu yalnızca **bilgisayarda kurulu Ollama**
-kullanabilir.
+Dört adım: indir, başlat, **"NOVA HAZIR"** yazısını bekle, konuş. `.env` dosyası ya da API anahtarı gerekmez.
+
+### Adım 1: Projeyi indirin
 
 ```bash
 git clone https://github.com/AbdullahKarakoc/akinrobotics-nova-voice-agent.git
 cd akinrobotics-nova-voice-agent
 ```
 
-`.env` gerekmez: API anahtarı yoktur, tüm ayarların varsayılanı vardır ([.env.example](.env.example) yalnızca
-değiştirmek için şablondur). Modeller ve SQLite veritabanı (`data/seed.sql`'den) ilk açılışta otomatik oluşturulur.
+### Adım 2: Başlatın (birini seçin)
 
-| Kurulum | LLM | Nerede | İlk ses (bu dizüstü, p50) |
-|---|---|---|---|
-| **A. GPU (önerilen)** | Qwen3-4B-Instruct-2507, 4-bit IQ4_XS (2.1 GB) | Bilgisayardaki Ollama, ekran kartı (%90 GPU) | **~6 sn** |
-| B. Tamamen Docker | Qwen3-4B-Instruct-2507, 4-bit Q4_K_M (2.5 GB) | Konteynerdeki Ollama, CPU | ~16 sn |
-| B + küçük model | Qwen3 1.7B, 4-bit Q4_K_M (1.3 GB) | Konteynerdeki Ollama, CPU | ~7.6 sn (daha çok uydurma, §4.3) |
-
-### A. GPU ile (bilgisayarda Ollama kurulu)
-
-Gereksinim: Docker (Compose v2) + [Ollama](https://ollama.com) (AMD kartlarda Vulkan için güncel sürücü). Model elle
-indirilmez: ajan ilk açılışta bilgisayardaki Ollama'ya indirtir (~2.1 GB).
+**A. Ekran kartıyla (önerilen).** Gereken: Docker Desktop ve bilgisayarda kurulu, açık [Ollama](https://ollama.com).
+AMD kartlarda güncel sürücü gerekir. İlk ses ~6 sn.
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.host-ollama.yml up --build agent
 ```
 
-Bu override ([docker-compose.host-ollama.yml](docker-compose.host-ollama.yml)) ajanı `host.docker.internal:11434`'e
-bağlar ve GPU ayarlarını yapar: model `LLM_MODEL_GPU` (varsayılan 4B IQ4_XS), bağlam 3072 token, LLM'in CPU'da kalan
-katmanları için 4 iş parçacığı (§2.2). Modelin GPU'da olduğu `ollama ps` ile görülür ("10%/90% CPU/GPU").
-Hız öncelikliyse: `LLM_MODEL_GPU=qwen3:1.7b-q4_K_M` (ilk ses ~3.4 sn).
-
-### B. Tamamen Docker (GPU'suz)
+**B. Yalnızca Docker (ekran kartı yok).** Gereken: yalnızca Docker Desktop. İşlemcide çalıştığı için daha yavaştır:
+ilk ses ~16 sn.
 
 ```bash
 docker compose up --build
 ```
 
-`ollama` (LLM sunucusu) + `ollama-pull` (modeli bir kez çeker) + `agent` konteynerleri açılır. İlk açılış uzun sürer:
-Ollama imajı (~9.4 GB), LLM (~2.5 GB) ve ses/embedding modelleri (~0.8 GB) bir kez indirilir; 4B modelin CPU'da
-ilk ısınması ~85 sn. İndirme sırasında terminal bir süre çıktı vermeyebilir: `docker compose logs -f`. Daha hızlı ama
-daha az doğru: `LLM_MODEL=qwen3:1.7b-q4_K_M docker compose up`.
+> Ekran kartı neden yalnızca A'da kullanılıyor? Docker Desktop (Windows) AMD ekran kartını konteynere
+> geçirmiyor. Bu yüzden A'da dil modeli (LLM) bilgisayardaki Ollama'da çalışır, geri kalan her şey Docker'da.
 
-### Her iki kurulumda
+### Adım 3: "NOVA HAZIR" yazısını bekleyin
 
-Tarayıcıda **http://localhost:8000** adresini açın, mikrofon düğmesine bir kez basın ve konuşun (sonraki turlarda
-tekrar basmaya gerek yok; "Dinlemeyi durdur" mikrofonu duraklatır). Hazır olduğunu `http://localhost:8000/health` →
-`"llm_ready": true` ile görebilirsiniz. Ayarlar `.env` dosyasıyla değiştirilir (`cp .env.example .env`); tüm seçenekler
-[app/config.py](app/config.py) içindedir.
+İlk açılışta modeller bir kez indirilir. İnternet hızına göre **10-20 dakika** sürebilir; sonraki açılışlar
+1-2 dakikadır. Terminalde sırasıyla şu çerçeveli mesajları görürsünüz:
 
-> Mikrofon erişimi tarayıcıda yalnızca `localhost` veya HTTPS üzerinden açılır. Hoparlörle (kulaklıksız) kullanımda
-> tarayıcının yankı giderme özelliği devrededir; yine de ajanın kendi sesini duyması sorun çıkarırsa `BARGE_IN=false`.
+```
+================================================================
+  İLK AÇILIŞ: ses ve arama modelleri indiriliyor (~0.8 GB)
+================================================================
+...
+================================================================
+  LLM İNDİRİLİYOR: hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:IQ4_XS
+================================================================
+app.llm.ollama_llm: llm download 10% (227 / 2270 MB)
+app.llm.ollama_llm: llm download 20% (454 / 2270 MB)
+...
+================================================================
+  NOVA HAZIR  ->  http://localhost:8000
+================================================================
+```
+
+**"NOVA HAZIR" çıkmadan konuşursanız** ajan "Dil modelim henüz hazır değil…" der. Bu bir hata değildir,
+indirmenin bitmesini bekleyin. Durumu tarayıcıdan da görebilirsiniz:
+`http://localhost:8000/health` → `"llm_status"`: `downloading` (iniyor) → `loading` (belleğe yükleniyor) → `ready`.
+
+Çerçevede **"LLM HAZIR DEĞİL"** görürseniz bir sorun var demektir. Altındaki hata satırına bakın. Genellikle Ollama
+kapalıdır (A) ya da internet veya disk alanı yetmemiştir. Ajan 10 saniyede bir yeniden dener.
+
+B kurulumunda dil modelini ayrı bir konteyner (`ollama-pull`) indirir. İlerlemesi o konteynerin satırlarında
+görünür. Ayrıca Ollama imajı (~9.4 GB) da bir kez indirilir.
+
+### Adım 4: Konuşun
+
+Tarayıcıda **http://localhost:8000** adresini açın, mikrofon düğmesine **bir kez** basın ve konuşun. Sonraki
+sorularda tekrar basmanız gerekmez; "Dinlemeyi durdur" mikrofonu kapatır.
+
+> Mikrofon tarayıcıda yalnızca `localhost` veya HTTPS üzerinden açılır. Kulaklıksız kullanımda ajan kendi sesini
+> duyup kendini kesiyorsa `.env` içine `BARGE_IN=false` yazın.
+
+### Ayarlar ve seçenekler
+
+| Ne istiyorsunuz? | Nasıl |
+|---|---|
+| Daha hızlı ama daha az doğru küçük model (A) | `LLM_MODEL_GPU=qwen3:1.7b-q4_K_M` ile başlatın (ilk ses ~3.4 sn) |
+| Daha hızlı ama daha az doğru küçük model (B) | `LLM_MODEL=qwen3:1.7b-q4_K_M docker compose up` (ilk ses ~7.6 sn, daha çok uydurma, §4.3) |
+| Modelin ekran kartında olduğunu görmek (A) | `ollama ps` → "10%/90% CPU/GPU" |
+| Başka bir ayarı değiştirmek | `cp .env.example .env` ve düzenleyin; tüm seçenekler [app/config.py](app/config.py) içinde |
+
+| Kurulum | LLM | Nerede çalışır | İlk ses (bu dizüstü, p50) |
+|---|---|---|---|
+| **A. Ekran kartı** | Qwen3-4B-Instruct-2507, 4-bit IQ4_XS (2.1 GB) | Bilgisayardaki Ollama (%90 GPU) | **~6 sn** |
+| B. Yalnızca Docker | Qwen3-4B-Instruct-2507, 4-bit Q4_K_M (2.5 GB) | Konteynerdeki Ollama, CPU | ~16 sn |
+| B + küçük model | Qwen3 1.7B, 4-bit Q4_K_M (1.3 GB) | Konteynerdeki Ollama, CPU | ~7.6 sn |
+
+A'nın ayarları [docker-compose.host-ollama.yml](docker-compose.host-ollama.yml) dosyasındadır: ajan
+`host.docker.internal:11434`'teki Ollama'ya bağlanır, bağlam 3072 token, LLM'in CPU'da kalan katmanları için
+4 iş parçacığı (§2.2). SQLite veritabanı (`data/seed.sql`'den) ilk açılışta otomatik oluşturulur.
 
 ### Docker'sız (geliştirme)
 
@@ -82,7 +115,7 @@ cp .env.example .env                                # ayar şablonu (gizli bilgi
 # Model .env'deki LLM_MODEL: GPU'da hf.co/unsloth/Qwen3-4B-Instruct-2507-GGUF:IQ4_XS önerilir.
 python -m scripts.download_models                   # Whisper, Piper sesleri, embedding modeli
 python -m app                                       # http://localhost:8000
-pytest                                              # 40 birim testi, model gerektirmez (MCP testleri sunucuyu yerelde başlatır)
+pytest                                              # 41 birim testi, model gerektirmez (MCP testleri sunucuyu yerelde başlatır)
 ```
 
 ### Diğer giriş noktaları
@@ -164,7 +197,7 @@ optimizasyonların çoğu "LLM'e daha az token göstermek" ve "beklemeyi paralel
 2. **Önbellek dostu prompt düzeni:** sistem promptu ve araç şemaları her turda birebir aynıdır → Ollama'nın KV önbelleği
    bunları yeniden işlemez. Tura özgü her şey (bağlam, araç verisi, dil talimatı) en sondaki kullanıcı mesajında.
 3. **Az ama isabetli bağlam:** en iyi 2 parça + en iyi skorun 0.15 altındakileri at; alaka eşiğinin altında bağlam hiç yok.
-4. **Deterministik araç yönlendirme:** "1003 numaralı sipariş", "T5'in fiyatı", "Ankara'da hava" gibi niyeti kesin
+4. **Deterministik araç yönlendirme:** "340 numaralı sipariş", "T5'in fiyatı", "Ankara'da hava" gibi niyeti kesin
    sorular, LLM'e sorulmadan regex ile tanınır; araç **arama ile paralel** çalışır ve sonuç bağlama eklenir. Bu, ikinci bir
    LLM turunu (prefill + üretim) tamamen ortadan kaldırır ve küçük modellerin araç çağırmayı "unutması" sorununu çözer.
    Yönlendiricinin kaçırdığı durumlarda LLM'in kendi araç çağırması yedek olarak çalışır; o durumda araç beklenirken
@@ -222,9 +255,9 @@ okunurdur.
 
 | Araç | Ne döner | Yönlendirici (LLM'siz) |
 |---|---|---|
-| `check_warranty` | Seri numarasına göre garanti (standart/uzatılmış), batarya garantisi, periyodik bakım durumu | seri no (5 hane) + "garanti/bakım" |
+| `check_warranty` | Seri numarasına göre garanti (standart/uzatılmış), batarya garantisi, periyodik bakım durumu | seri no (4 hane) + "garanti/bakım" |
 | `get_robot_diagnostics` | Uzaktan teşhis: çevrimiçi mi, pil %, yazılım sürümü, aktif hata kodu ve müşterinin yapabileceği | seri no + "çalışmıyor/hata/şarj/ne durumda…" |
-| `get_service_ticket_status` | Servis talebinin durumu, teknisyen ziyareti, beklenen çözüm tarihi | talep no (4 hane) + "talep/kayıt/ticket" |
+| `get_service_ticket_status` | Servis talebinin durumu, teknisyen ziyareti, beklenen çözüm tarihi | talep no (2 hane) + "talep/kayıt/ticket" |
 
 **2. Wikipedia (üçüncü taraf, açık kaynak sunucu):** [`wikipedia-mcp`](https://github.com/rudra-ravi/wikipedia-mcp),
 canlı Wikipedia API'sine gider. TR ve EN için iki ayrı örnek çalışır. Tek görevi, müşterinin cevaplarda ve
@@ -265,8 +298,10 @@ injection yüzeyi de küçük kalıyor.
 **Bu projenin kurallarına nasıl uyuyor:**
 
 * **Yönlendiriciler ajan tarafında, araç adına göre tanımlı.** Bunlar ajanın gecikme stratejisinin parçası, veri
-  kaynağının değil. Seri numarası 5, talep ve sipariş numarası 4 hanelidir; yönlendiriciler bu sayede birbirine ve
-  sipariş yönlendiricisine karışmaz.
+  kaynağının değil. Seri numarası 4 (R2-3100), sipariş numarası 3 (340), servis talebi numarası 2 hanelidir (26).
+  Numaralar kısa ve söylemesi kolay seçildi, çünkü "bin üç" ya da "yirmi bir bin beş yüz yedi" gibi uzun sayıları
+  konuşma tanıma sık yanlış yazıyordu. Yönlendiriciler hane sayısı sayesinde birbirine karışmaz. Yıl gibi görünen
+  sayılar (1900-2099) ve "sipariş" geçen sorular seri numarası sayılmaz.
 * **Genel web araçları LLM'e verilmez.** Her ek şema, 4B modelin araç seçimini zorlaştırır ve önbelleklenen
   prompt'u büyütür. Wikipedia'nın LLM'e eklediği şema sayısı sıfırdır.
 * **Araç çıktısında karar metin olarak yazılır.** İlk sürümde `"in_warranty": false` dönülüyordu, model ise
@@ -286,7 +321,7 @@ injection yüzeyi de küçük kalıyor.
   sürenin tamamı beklenmiyor.
 
 **Mevcut davranış bozuldu mu?** 26 soruluk eval (GPU, IQ4_XS), önce yalnızca Nova Servis, sonra Wikipedia da açıkken
-iki kez tekrar çalıştırıldı. Doğruluk sayıları her ikisinde de değişmedi: 24/26 geçti, olgu 18/19, ret 4/5, araç
+iki kez tekrar çalıştırıldı. Doğruluk sayıları her ikisinde de değişmedi (metrikler: §4.3): 24/26 geçti, olgu doğruluğu 18/19, doğru ret 4/5, araç
 seçimi 7/7, dil 26/26, kaynaksız sayı 0. Medyan gecikme 5847 → 5995 / 5936 ms, ilk token 1910 → 1980 / 1978 ms. Bu
 fark ölçüm gürültüsü düzeyinde. Eval'deki alan dışı sorularda Wikipedia hiç çağrılmadı.
 
@@ -303,14 +338,14 @@ Bir araç iki yoldan çağrılır:
 
 | Araç | Kaynak | Ne döner | Yönlendirici ne zaman çağırır | Örnek soru |
 |---|---|---|---|---|
-| `get_order_status` | SQLite | Sipariş durumu, tahmini teslim | "sipariş/order" + 3-7 haneli numara | "1003 numaralı siparişim ne durumda?" |
+| `get_order_status` | SQLite | Sipariş durumu, tahmini teslim | "sipariş/order" + 3-7 haneli numara | "340 numaralı siparişim ne durumda?" |
 | `get_product_info` | SQLite | Liste fiyatı (KDV hariç), stok, teslim süresi | "fiyat/ücret/kaç para/stok/satın al/teslim/price/cost/stock/buy" + ürün adı, kodu veya takma adı | "Taşıyıcı T5'in fiyatı ne kadar?", "How much does the education kit cost?" |
 | `find_service_center` | SQLite | Servis merkezi adresi ve telefonu | "servis/tamir/service center" + şehir | "İzmir'de servis merkeziniz var mı?" |
 | `get_weather` | Open-Meteo (canlı web) | Sıcaklık, hava durumu, günlük min/maks | hava kelimeleri ("hava nasıl", "sıcaklık", "weather") + şehir | "Ankara'da hava nasıl?" |
 | `get_current_datetime` | Sistem saati | Tarih, gün, saat (İstanbul) | "saat kaç / bugün günlerden ne / what time" | "Saat kaç?" |
-| `check_warranty` | MCP · Nova Servis | Garanti VAR/YOK ve bitiş tarihi, batarya garantisi, bakım durumu | 5 haneli seri no + "garanti/bakım/warranty/maintenance" | "21507 seri numaralı robotumun garantisi devam ediyor mu?" |
-| `get_robot_diagnostics` | MCP · Nova Servis | Çevrimiçi mi, pil %, yazılım sürümü, aktif hata ve öneri | 5 haneli seri no + "çalışmıyor/hata/arıza/şarj/ne durumda/status/offline" | "24012 numaralı robotum çalışmıyor." |
-| `get_service_ticket_status` | MCP · Nova Servis | Talep durumu, teknisyen ziyareti, beklenen çözüm | 4 haneli numara + "talep/kayıt/başvuru/ticket/request" | "5003 numaralı servis talebim ne durumda?" |
+| `check_warranty` | MCP · Nova Servis | Garanti VAR/YOK ve bitiş tarihi, batarya garantisi, bakım durumu | 4 haneli seri no + "garanti/bakım/warranty/maintenance" | "4500 seri numaralı robotumun garantisi devam ediyor mu?" |
+| `get_robot_diagnostics` | MCP · Nova Servis | Çevrimiçi mi, pil %, yazılım sürümü, aktif hata ve öneri | 4 haneli seri no + "çalışmıyor/hata/arıza/şarj/ne durumda/status/offline" | "3200 numaralı robotum çalışmıyor." |
+| `get_service_ticket_status` | MCP · Nova Servis | Talep durumu, teknisyen ziyareti, beklenen çözüm | 2 haneli numara + "talep/kayıt/başvuru/ticket/request" | "37 numaralı servis talebim ne durumda?" |
 | `wikipedia_tr_get_summary` | MCP · wikipedia-mcp (TR, canlı web) | Türkçe madde özeti (≤ 500 karakter) | Türkçe "nedir/ne demek/nasıl çalışır" + sözlükteki terim (Türkçe maddesi varsa) | "LiDAR nedir?", "Yapay zeka ne demek?" |
 | `wikipedia_en_get_summary` | MCP · wikipedia-mcp (EN, canlı web) | İngilizce madde özeti (≤ 500 karakter) | İngilizce "what is/what does … mean" + sözlükteki terim; ya da Türkçe maddesi olmayan terim | "What is a humanoid robot?", "SLAM nedir?" |
 
@@ -322,7 +357,8 @@ Bir araç iki yoldan çağrılır:
 | "Rehber R2'nin sensörleri nedir?" | Bizim ürünümüzle ilgili: Wikipedia değil, doküman. |
 | "Garanti süresi ne kadar?" | Numara yok, genel politika: doküman. |
 | "Siparişim ne durumda?" / "Hava nasıl?" | Numara veya şehir yok, yönlendirici tetiklenmez. LLM eksik bilgiyi kullanıcıya sorar. Sipariş aracını numarasız çağırırsa araç "numara yok, kullanıcıya sor" döner. |
-| "1003 numaralı siparişim ne durumda?" | 4 hane ama "sipariş" geçiyor: servis talebi değil, sipariş aracı. |
+| "340 numaralı siparişim ne durumda?" | "Ne durumda" geçiyor ama numara 3 haneli ve "sipariş" var: robot teşhisi değil, sipariş aracı. |
+| "2025'te aldığım robot çalışmıyor." | 2025 bir yıl, seri numarası değil: teşhis aracı çağrılmaz. |
 | "Türkiye'nin başkenti nedir?" | Alan dışı. Hiçbir araç çağrılmaz, model reddetmelidir (bu soru küçük modellerin bilinen zayıflığı, §5). |
 
 Yönlendiriciler: yerel araçlar için [app/tools/database.py](app/tools/database.py) ve
@@ -442,6 +478,15 @@ TTS ilk cümle 1.1 sn). 4B ölçümü: [reports/voice_qwen3-4b-instruct-iq4_rag_
 4'ünde **yok** (genel kültür, kaynakta olmayan ürün ağırlığı, kaynakta olmayan genel müdür adı) — bunlarda doğru davranış
 "bilmiyorum" demektir; 7'si araç gerektirir. Her soru yeni bir konuşmada, `/api/chat` üzerinden sorulur
 (`python -m scripts.evaluate`, tüm yapılandırmalar için `scripts/eval_matrix.ps1`). Çıktılar: [reports/](reports/).
+
+**Metrikler ne anlama geliyor:**
+
+* **Olgu (olgu doğruluğu):** cevabı kaynaklarda olan sorularda ajan doğru bilgiyi verdi mi? Cevapta beklenen
+  ifade geçmeli; örneğin pil ömrü sorusunda "8".
+* **Doğru ret:** cevabı kaynaklarda olmayan sorularda ajan uydurmak yerine "bu bilgiye sahip değilim" dedi mi?
+  Bu, halüsinasyon testidir. Cevapta ret ifadesi olmalı. Kaynakta olmayan bir sayı ya da yasak bir ifade (ör.
+  başkent sorusunda "Ankara") geçmemeli.
+* **Geçen:** sorunun tüm kontrolleri (olgu/ret, araç, dil) başarılı.
 
 | LLM | Bilgi modu | Geçen | Olgu doğruluğu | Doğru ret | Araç seçimi | Cevap dili | Kaynaksız sayı içeren cevap | LLM ilk token p50 | Toplam cevap p50 |
 |---|---|---|---|---|---|---|---|---|---|

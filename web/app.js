@@ -4,6 +4,16 @@
 const $ = (id) => document.getElementById(id);
 const micBtn = $("mic"), ring = $("ring"), statusEl = $("status"), connEl = $("conn");
 const messagesEl = $("messages"), composer = $("composer"), textInput = $("text");
+const NOVA_MARK = '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M10 22V10l12 12V10" /></svg>';
+const ICONS = {
+  document: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5M9 13h6M9 17h4" /></svg>',
+  tool: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z" /></svg>',
+};
+const LLM_STATUS = {
+  starting: "model başlatılıyor…",
+  downloading: "model indiriliyor (ilk açılış)…",
+  loading: "model belleğe yükleniyor…",
+};
 
 const STATUS = {
   idle: "Başlamak için mikrofona bir kez dokunun",
@@ -27,12 +37,16 @@ let droppedTurn = 0; // audio of this turn (and older) is discarded after an int
 let currentAgentMsg = null;
 let currentTurn = 0;
 const history = [];
+let online = false, llmName = "", llmStatus = "ready", healthTimer = null;
 
 // --------------------------------------------------------------- websocket
 function connect() {
   ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
   ws.binaryType = "arraybuffer";
-  ws.onopen = () => setConn(true);
+  ws.onopen = () => {
+    setConn(true);
+    pollHealth();
+  };
   ws.onclose = () => {
     setConn(false);
     setTimeout(connect, 1500);
@@ -44,15 +58,37 @@ function send(obj) {
   if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
 }
 
-function setConn(online, label) {
-  connEl.dataset.state = online ? "online" : "offline";
-  connEl.textContent = label || (online ? "bağlı" : "bağlantı yok");
+function setConn(isOnline) {
+  online = isOnline;
+  const loading = online && llmStatus !== "ready";
+  connEl.dataset.state = !online ? "offline" : loading ? "loading" : "online";
+  connEl.textContent = !online
+    ? "bağlantı yok"
+    : loading
+      ? LLM_STATUS[llmStatus] || "model hazırlanıyor…"
+      : `bağlı${llmName ? ` · ${llmName.split("/").pop()}` : ""}`;
+  connEl.title = llmName;
+}
+
+// On first start the LLM may still be downloading: show it instead of letting questions fail.
+async function pollHealth() {
+  clearTimeout(healthTimer);
+  try {
+    const health = await (await fetch("/health")).json();
+    llmStatus = health.llm_status || (health.llm_ready ? "ready" : "loading");
+    llmName = llmName || health.llm_model || "";
+  } catch {
+    llmStatus = "loading";
+  }
+  setConn(online);
+  if (llmStatus !== "ready") healthTimer = setTimeout(pollHealth, 3000);
 }
 
 function onEvent(ev) {
   switch (ev.type) {
     case "ready":
-      setConn(true, `bağlı · ${ev.llm}`);
+      llmName = ev.llm || llmName;
+      setConn(true);
       break;
     case "vad":
       if (ev.state === "speech_start") setState("hearing");
@@ -84,7 +120,7 @@ function onEvent(ev) {
       if (currentAgentMsg && ev.reason === "barge_in") currentAgentMsg.classList.add("interrupted");
       break;
     case "reset":
-      messagesEl.innerHTML = "";
+      showWelcome();
       break;
     case "error":
       if (currentAgentMsg) appendAgentText(currentAgentMsg, `⚠ ${ev.message}`);
@@ -194,52 +230,78 @@ function reportPlaying(value) {
 
 function setState(state) {
   micBtn.dataset.state = micOn || state !== "listening" ? state : "idle";
+  document.body.dataset.state = micBtn.dataset.state; // drives the halo and the step indicator
   statusEl.textContent = STATUS[micBtn.dataset.state];
 }
 
 // -------------------------------------------------------------------- chat
+function showWelcome() {
+  messagesEl.replaceChildren($("welcome").content.cloneNode(true));
+}
+
 function clearEmpty() {
   messagesEl.querySelector(".empty")?.remove();
+}
+
+function scrollToEnd(li) {
+  li.scrollIntoView({ block: "end", behavior: "smooth" });
 }
 
 function addUserMessage(text, language) {
   clearEmpty();
   const li = document.createElement("li");
   li.className = "msg user";
-  const badge = document.createElement("span");
-  badge.className = "badge";
-  badge.textContent = (language || "").toUpperCase();
-  li.append(badge, document.createTextNode(text));
+  const bubble = document.createElement("div");
+  bubble.className = "bubble";
+  if (language) {
+    const badge = document.createElement("span");
+    badge.className = "badge";
+    badge.textContent = language.toUpperCase();
+    bubble.append(badge);
+  }
+  bubble.append(document.createTextNode(text));
+  li.append(bubble);
   messagesEl.append(li);
-  li.scrollIntoView({ block: "end", behavior: "smooth" });
+  scrollToEnd(li);
 }
 
 function addAgentMessage() {
   const li = document.createElement("li");
   li.className = "msg agent";
-  li.innerHTML = '<div class="body">…</div><div class="meta"></div>';
+  li.innerHTML =
+    `<span class="avatar">${NOVA_MARK}</span>` +
+    '<div class="bubble"><div class="body pending"><span class="dots"><i></i><i></i><i></i></span></div><div class="meta"></div></div>';
   messagesEl.append(li);
+  scrollToEnd(li);
   return li;
 }
 
 function appendAgentText(li, text) {
   const body = li.querySelector(".body");
-  body.textContent = (body.textContent === "…" ? "" : body.textContent + " ") + text;
-  li.scrollIntoView({ block: "end", behavior: "smooth" });
+  if (body.classList.contains("pending")) {
+    body.classList.remove("pending");
+    body.textContent = text;
+  } else {
+    body.textContent += ` ${text}`;
+  }
+  scrollToEnd(li);
 }
 
 function finishAgentMessage(li, ev) {
-  li.querySelector(".body").textContent = ev.text || "…";
+  const body = li.querySelector(".body");
+  body.classList.remove("pending");
+  body.textContent = ev.text || "…";
   const meta = li.querySelector(".meta");
   const seen = new Set();
   for (const s of ev.sources || []) {
-    const label = s.type === "tool" ? `🔧 ${s.id}` : `📄 ${s.id}`;
-    if (seen.has(label)) continue;
-    seen.add(label);
+    const key = `${s.type}:${s.id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
     const chip = document.createElement("span");
     chip.className = `chip ${s.type}`;
-    chip.textContent = label;
-    chip.title = s.type === "tool" ? JSON.stringify(s.args) : `${s.title} (skor ${s.score})`;
+    chip.innerHTML = ICONS[s.type] || "";
+    chip.append(document.createTextNode(s.id));
+    chip.title = s.type === "tool" ? `Araç · ${JSON.stringify(s.args)}` : `Doküman · ${s.title} (skor ${s.score})`;
     meta.append(chip);
   }
   if (ev.ungrounded_numbers?.length) {
@@ -248,6 +310,7 @@ function finishAgentMessage(li, ev) {
     warn.textContent = `⚠ kaynakta olmayan sayı: ${ev.ungrounded_numbers.join(", ")}`;
     meta.append(warn);
   }
+  scrollToEnd(li);
 }
 
 // ----------------------------------------------------------------- metrics
@@ -318,14 +381,24 @@ $("mic-off").addEventListener("click", () => {
   setMicActive(false); // pause: no audio is sent until the mic button is pressed again
 });
 
-composer.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const text = textInput.value.trim();
+async function sendText(text) {
   if (!text) return;
   await ensureAudio();
   stopPlayback();
   send({ type: "text", text });
+}
+
+composer.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const text = textInput.value.trim();
   textInput.value = "";
+  await sendText(text);
+});
+
+// Example questions in the welcome card are sent like typed ones.
+messagesEl.addEventListener("click", (e) => {
+  const button = e.target.closest(".suggestions button");
+  if (button) sendText(button.dataset.q);
 });
 
 $("reset").addEventListener("click", () => {
@@ -333,4 +406,5 @@ $("reset").addEventListener("click", () => {
   send({ type: "reset" });
 });
 
+showWelcome();
 connect();

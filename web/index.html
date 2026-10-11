@@ -4,36 +4,56 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Nova Sesli Asistan</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%234f46e5'/%3E%3Cpath d='M10 22V10l12 12V10' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
     <link rel="stylesheet" href="/static/style.css" />
   </head>
-  <body>
+  <body data-state="idle">
     <header class="topbar">
       <div class="brand">
-        <span class="logo" aria-hidden="true"></span>
+        <span class="logo" aria-hidden="true">
+          <svg viewBox="0 0 32 32"><path d="M10 22V10l12 12V10" /></svg>
+        </span>
         <div>
-          <h1>Nova Sesli Asistan</h1>
-          <p class="subtitle">Türkçe / English · sesten sese yapay zeka ajanı</p>
+          <h1>Nova <span>Sesli Asistan</span></h1>
+          <p class="subtitle">Nova Robotik · Türkçe / English</p>
         </div>
       </div>
       <div class="conn" id="conn" data-state="offline">bağlantı yok</div>
     </header>
 
     <main class="layout">
-      <section class="stage">
-        <button id="mic" class="mic" data-state="idle" aria-label="Konuşmayı başlat">
-          <span class="ring" id="ring"></span>
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2Z" />
-          </svg>
-        </button>
-        <p class="status" id="status">Başlamak için mikrofona bir kez dokunun</p>
-        <p class="hint">Mikrofon konuşma boyunca açık kalır; her soru için tekrar basmanız gerekmez. Sustuğunuzda
-          asistan cevap verir. Kulaklıkla asistanın sözünü keserek konuşabilirsiniz.</p>
-        <button id="mic-off" class="ghost" hidden>Dinlemeyi durdur</button>
+      <section class="stage card">
+        <div class="mic-wrap">
+          <span class="halo" aria-hidden="true"></span>
+          <button id="mic" class="mic" data-state="idle" aria-label="Konuşmayı başlat">
+            <span class="ring" id="ring"></span>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2Z" />
+            </svg>
+          </button>
+        </div>
 
-        <div class="latency card" id="latency" hidden>
+        <p class="status" id="status" aria-live="polite">Başlamak için mikrofona bir kez dokunun</p>
+
+        <ol class="steps" aria-hidden="true">
+          <li data-step="listening">Dinliyor</li>
+          <li data-step="thinking">Düşünüyor</li>
+          <li data-step="speaking">Konuşuyor</li>
+        </ol>
+
+        <ul class="hint">
+          <li>Mikrofon konuşma boyunca açık kalır; her soru için tekrar basmanız gerekmez.</li>
+          <li>Sustuğunuzda asistan cevap verir.</li>
+          <li>Asistan konuşurken konuşarak ya da düğmeye basarak sözünü kesebilirsiniz.</li>
+        </ul>
+        <button id="mic-off" class="ghost" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2" /></svg>
+          Dinlemeyi durdur
+        </button>
+
+        <div class="latency" id="latency" hidden>
           <div class="latency-head">
-            <span>Son tur</span>
+            <span>Son tur · ilk sese kadar</span>
             <strong id="lat-total">–</strong>
           </div>
           <div class="bar" id="lat-bar"></div>
@@ -44,15 +64,38 @@
 
       <section class="chat card">
         <div class="chat-head">
-          <h2>Konuşma</h2>
-          <button id="reset" class="ghost">Sıfırla</button>
+          <div>
+            <h2>Konuşma</h2>
+            <p class="chat-sub">Cevaplar yalnızca Nova Robotik kaynaklarına dayanır</p>
+          </div>
+          <button id="reset" class="ghost" title="Konuşma geçmişini temizle">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.34-5.66M4 4v4h4" /></svg>
+            Sıfırla
+          </button>
         </div>
-        <ol class="messages" id="messages">
-          <li class="empty">Örnek sorular: “Rehber R2'nin pil ömrü ne kadar?”, “340 numaralı siparişim nerede?”, “What is the warranty period?”, “Ankara'da hava nasıl?”</li>
-        </ol>
+        <ol class="messages" id="messages"></ol>
+        <template id="welcome">
+          <li class="empty">
+            <div class="welcome-icon" aria-hidden="true">
+              <svg viewBox="0 0 32 32"><path d="M10 22V10l12 12V10" /></svg>
+            </div>
+            <h3>Merhaba, ben Nova</h3>
+            <p>Ürünler, garanti, servis, siparişler ve hava durumu hakkında sesli ya da yazılı sorabilirsiniz.</p>
+            <div class="suggestions">
+              <button type="button" data-q="Rehber R2'nin pil ömrü ne kadar?">Rehber R2'nin pil ömrü ne kadar?</button>
+              <button type="button" data-q="340 numaralı siparişim nerede?">340 numaralı siparişim nerede?</button>
+              <button type="button" data-q="3200 numaralı robotum çalışmıyor.">3200 numaralı robotum çalışmıyor.</button>
+              <button type="button" data-q="What is the warranty period?">What is the warranty period?</button>
+              <button type="button" data-q="Ankara'da hava nasıl?">Ankara'da hava nasıl?</button>
+              <button type="button" data-q="LiDAR nedir?">LiDAR nedir?</button>
+            </div>
+          </li>
+        </template>
         <form class="composer" id="composer">
           <input id="text" type="text" placeholder="Yazarak da sorabilirsiniz…" autocomplete="off" />
-          <button type="submit">Gönder</button>
+          <button type="submit" aria-label="Gönder">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15M13 6l6 6-6 6" /></svg>
+          </button>
         </form>
       </section>
     </main>

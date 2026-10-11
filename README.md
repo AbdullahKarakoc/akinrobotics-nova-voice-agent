@@ -110,8 +110,8 @@ flowchart LR
     VAD -->|ifade| STT[faster-whisper small<br/>dil tespiti TR/EN]
     STT --> AG{Ajan}
     AG -->|paralel| RT[Araç yönlendirici<br/>SQLite · Open-Meteo · saat]
-    RT <-->|MCP · stdio / HTTP| MCP[Nova Servis MCP sunucusu<br/>garanti · teşhis · servis talebi]
-    RT <-->|MCP · stdio| WIKI[wikipedia-mcp TR / EN<br/>terim açıklama · canlı web]
+    RT -->|MCP| NOVA[Nova Servis MCP sunucusu<br/>garanti · teşhis · servis talebi]
+    RT -->|MCP| WIKI[wikipedia-mcp TR / EN<br/>terim açıklama · canlı web]
     AG -->|paralel| RAG[Hibrit arama<br/>BM25 + çok dilli embedding]
     RT --> LLM[LLM · Ollama · 4-bit<br/>Qwen3-4B-Instruct · araç çağırma]
     RAG --> LLM

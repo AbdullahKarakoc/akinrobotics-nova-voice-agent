@@ -44,8 +44,18 @@ ilk ses ~16 sn.
 docker compose up --build
 ```
 
-> Ekran kartı neden yalnızca A'da kullanılıyor? Docker Desktop (Windows) AMD ekran kartını konteynere
-> geçirmiyor. Bu yüzden A'da dil modeli (LLM) bilgisayardaki Ollama'da çalışır, geri kalan her şey Docker'da.
+**Ekran kartı (GPU) hakkında:**
+
+* **Bu projenin geliştirildiği bilgisayarda AMD ekran kartı (RX 560X) var.** Docker Desktop (Windows) AMD ekran
+  kartını konteynere geçiremiyor. Bu yüzden konteynerdeki Ollama bu bilgisayarda ekran kartını kullanamıyor, yalnızca
+  işlemcide (CPU) çalışıyor. Ekran kartını kullanmanın tek yolu A kurulumu: dil modeli (LLM) Docker dışında,
+  bilgisayara kurulu Ollama'da çalışır, geri kalan her şey Docker'da kalır.
+* **B kurulumu NVIDIA ekran kartlı bir bilgisayarda da işlemcide çalışır.** [docker-compose.yml](docker-compose.yml)
+  konteynere ekran kartı istemiyor. NVIDIA'da LLM'i konteyner içinde ekran kartında çalıştırmak için `ollama`
+  servisine bir GPU ayarı (`deploy.resources.reservations.devices`, `driver: nvidia`) eklemek ve NVIDIA Container
+  Toolkit'i kurmak gerekir. Bu yol bu projede denenmedi. NVIDIA'da A kurulumu ek ayar gerektirmeden çalışır.
+* Ajan konteyneri (Whisper, Piper, arama) her iki kurulumda da işlemcide çalışır. Gecikmenin asıl kaynağı LLM
+  olduğu için ekran kartı en çok orada fark yaratır.
 
 ### Adım 3: "NOVA HAZIR" yazısını bekleyin
 
@@ -327,14 +337,36 @@ fark ölçüm gürültüsü düzeyinde. Eval'deki alan dışı sorularda Wikiped
 
 ### 2.6 Araçlar: hangi soru hangi aracı çağırır
 
-Bir araç iki yoldan çağrılır:
+Araç çağırmanın tamamı `Agent.respond()` içindedir ([app/agent/agent.py](app/agent/agent.py)). Bir turda iki yol
+vardır:
 
-1. **Yönlendirici (router), LLM'den önce:** soruda niyet kelimesi ve gereken bilgi (numara, şehir, ürün, terim)
-   birlikte varsa araç regex ile tanınır ve doküman aramasıyla **paralel** çalışır. Sonuç LLM'e "LIVE DATA" olarak
-   hazır verilir, ikinci bir LLM turu gerekmez. Bir soruda birden çok yönlendirici tetiklenebilir; hepsi paralel çalışır.
-2. **LLM'in kendi araç çağrısı (yedek yol):** yönlendirici tetiklenmezse (bilgi eksik, alışılmadık ifade) model
-   araç şemalarına bakıp kendisi çağırabilir. Tur başına en fazla 2 araç turu yapılır. Araç beklenirken "Bir saniye,
-   kontrol ediyorum." denir. Wikipedia araçları bu yolda **yoktur**: LLM onları görmez.
+**1. Yönlendirici (router), LLM'den önce: asıl yol**
+
+* **Nerede:** `ToolRegistry.route(soru)` ([app/tools/registry.py](app/tools/registry.py)) her aracın `router`
+  fonksiyonunu çalıştırır.
+* **Şart:** soruda niyet kelimesi **ve** gereken bilgi birlikte olmalı. Örneğin "sipariş" + 3 haneli numara,
+  "hava" + şehir, "fiyat" + ürün. Biri eksikse yönlendirici tetiklenmez.
+* **Nasıl:** tetiklenen araçlar doküman aramasıyla **paralel** çalışır. Sonuç kullanıcı mesajına `LIVE DATA` olarak
+  eklenir. Model aracı seçmek zorunda kalmaz, ek LLM turu da gerekmez. Birden çok yönlendirici tetiklenirse hepsi
+  paralel çalışır.
+
+**2. LLM'in kendi araç çağrısı: yedek yol**
+
+* **Nerede:** LLM'e her turda araç şemaları verilir: 8 araç; iki Wikipedia aracı verilmez, onlar yalnızca
+  yönlendiriciyle çağrılır. Model gerekirse `tool_calls` döner.
+* **Şart:** yönlendirici yakalayamamıştır (alışılmadık ifade, bilgi önceki mesajda kalmış vb.) ve model aracı
+  gerekli görmüştür.
+* **Nasıl:** araç çalışır, sonucu `tool` mesajı olarak modele geri verilir, model cevabı yazar.
+  * En fazla 2 araç turu yapılır (`MAX_TOOL_ROUNDS`). Son turda şema verilmez, model cevap vermek zorunda kalır.
+  * Model henüz bir şey söylemediyse araç beklenirken "Bir saniye, kontrol ediyorum." okunur.
+  * Model çağrıyı düz metin olarak yazarsa (`{"name": ...}`), `LeakedToolCallGuard` bu metni seslendirmez ve
+    gerçek bir araç çağrısına çevirir.
+
+**Her iki yolda çalıştırma:** `ToolRegistry.execute()`.
+
+* Şemada olmayan argümanlar atılır.
+* 8 sn zaman aşımı vardır.
+* Hata fırlatılmaz: modele `{"error": "... bilgi şu an yok de"}` döner, böylece model sonuç uydurmaz.
 
 | Araç | Kaynak | Ne döner | Yönlendirici ne zaman çağırır | Örnek soru |
 |---|---|---|---|---|
@@ -365,6 +397,27 @@ Yönlendiriciler: yerel araçlar için [app/tools/database.py](app/tools/databas
 [app/tools/web_apis.py](app/tools/web_apis.py), MCP araçları için [app/tools/mcp_tools.py](app/tools/mcp_tools.py) ve
 [app/tools/wikipedia.py](app/tools/wikipedia.py). Örnek soruların hepsi birim testlerinde doğrulanıyor
 ([tests/test_tools.py](tests/test_tools.py), [tests/test_mcp_tools.py](tests/test_mcp_tools.py)).
+
+### 2.7 Teknoloji seçimleri ve muadilleri
+
+Ortak ölçüt: **tamamen yerel ve ücretsiz** (API anahtarı yok, ses dışarı gitmez), **Türkçe + İngilizce**, sıradan bir
+dizüstünün **işlemcisinde gerçek zamanlı** çalışabilmek. Bulut servisleri (Google/Azure STT, OpenAI, ElevenLabs)
+daha kaliteli olabilir ama bu ölçütlerin üçünü de bozar.
+
+| Katman | Seçilen | Neden | Muadiller ve neden seçilmedi |
+|---|---|---|---|
+| **STT** (konuşma → metin) | faster-whisper `small`, int8 | TR ve EN tek modelde, dili kendisi tespit ediyor. CTranslate2 sayesinde CPU'da hızlı: 2.5 sn'lik komut ~1.1 sn, TR WER %21 (§4.4) | **Whisper `medium`**: TR hatası daha düşük (%12) ama bu CPU'da 26 sn, canlı konuşma için yavaş. **Vosk**: hızlı, ama Türkçe doğruluğu düşük. **whisper.cpp**: AMD kartta Vulkan ile çalışabilir ama Windows'ta derleme gerekiyor, denenmedi |
+| **VAD** (konuşma bitti mi?) | Silero VAD (ONNX) | 2 MB, çerçeve başına < 1 ms, gürültüde sağlam. faster-whisper ile birlikte geliyor | **WebRTC VAD**: enerjiye bakar, gürültüde ve nefeste yanılır |
+| **LLM sunucusu** | Ollama | Tek komutla model indirme, CPU/GPU (AMD'de Vulkan), araç çağırma, sistem promptunu önbellekte tutma | **llama.cpp server / LM Studio / vLLM**: OpenAI uyumlu arka uçla zaten kullanılabilir (`LLM_BACKEND=openai`). vLLM pratikte NVIDIA ister |
+| **LLM** | Qwen3-4B-Instruct-2507, 4-bit | Ölçülen modeller içinde Türkçesi, araç çağırması ve "bilmiyorum" demesi en iyi olan; 4-bit ile 4 GB karta ~%90 sığıyor (§4.3) | **Qwen3 1.7B**: daha hızlı (ilk ses ~3.4 sn) ama daha çok uydurma. **Qwen2.5 1.5B / 3B**: daha çok halüsinasyon / daha yavaş. Diğer aileler (Llama, Gemma) ölçülmedi |
+| **TTS** (metin → ses) | Piper (VITS, ONNX) | Türkçe ve İngilizce ses var, CPU'da gerçek zamandan 3-5 kat hızlı (RTF ~0.2-0.3), cümle cümle akış için uygun | **XTTS v2**: Türkçesi daha doğal ama CPU'da gerçek zamandan yavaş. **Kokoro**: hızlı ve kaliteli ama Türkçe sesi yok. **Bulut TTS**: ücretli, internet ister |
+| **Arama (RAG)** | Hibrit: çok dilli embedding (MiniLM-L12, fastembed) + BM25 | TR soru ↔ EN doküman eşleşir; BM25 "T5", "E02" gibi kodları yakalar. PyTorch gerekmiyor (ONNX), model 220 MB | **multilingual-e5-large**: daha iyi ama 2.2 GB ve yavaş. **Yalnızca embedding**: ürün kodlarını karıştırıyor |
+| **Vektör deposu** | NumPy matrisi | 31 parça için arama ~10 ms; ayrı servis gerekmez | **Qdrant, pgvector, Chroma**: binlerce dokümanda mantıklı, burada gereksiz bir servis |
+| **Veritabanı** | SQLite | Kurulum yok, tek dosya, salt okunur açılıyor | **PostgreSQL**: bu veri boyutu için gereksiz ağırlık |
+| **Dış araçlar** | MCP (resmî Python SDK) | Başka ekibin sistemi gibi davranan servis ve Wikipedia, kodlarını içe aktarmadan standart protokolle bağlanıyor (§2.5) | **Doğrudan REST çağrısı**: her servis için ayrı istemci kodu gerekir |
+| **Hava durumu** | Open-Meteo | Ücretsiz, API anahtarı yok | **OpenWeatherMap**: anahtar gerekir |
+| **Sunucu** | FastAPI + WebSocket | async, ses akışı için WebSocket, az kod | **Flask**: async ve WebSocket desteği zayıf. **WebRTC**: tarayıcı-sunucu arası daha düşük gecikme ama kurulumu çok daha karmaşık |
+| **İstemci** | Saf HTML/JS + AudioWorklet | Derleme ve kurulum gerektirmez; mikrofon sesi tarayıcıda 16 kHz'e çevrilir | **React vb.**: bu boyutta gereksiz |
 
 ---
 

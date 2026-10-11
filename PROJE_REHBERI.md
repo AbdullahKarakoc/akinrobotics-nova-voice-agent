@@ -444,12 +444,24 @@ ve testlerde görülen "Rehber ve iki", "Zehbe Z2", "Vehbar ve iki", "Heddar ve 
 
 ### 6.10 `app/tools/` — araçlar
 
-**Genel bakış: 10 araç, iki çağrılma yolu** (ayrıntılı tablo: README §2.6)
+**Genel bakış: 10 araç, iki çağrılma yolu** (ayrıntılı tablo: README §2.6). Hepsi `Agent.respond()` içinde olur.
 
-1. **Yönlendirici (router):** LLM'den önce, soruda niyet kelimesi ve gereken bilgi birlikte varsa regex ile çalışır.
-   Doküman aramasıyla paralel yürür, sonuç LLM'e "LIVE DATA" olarak gider. İkinci LLM turu olmaz.
-2. **LLM'in araç çağrısı (yedek):** yönlendirici kaçırırsa model şemaya bakıp kendisi çağırır. LLM 8 aracın şemasını
-   görür; iki Wikipedia aracını görmez.
+| | 1. Yönlendirici (asıl yol) | 2. LLM'in araç çağrısı (yedek yol) |
+|---|---|---|
+| **Ne zaman** | LLM'den **önce**, her soruda | LLM cevap üretirken |
+| **Nerede** | `ToolRegistry.route()` → her aracın `router` fonksiyonu | LLM'e verilen şemalar → modelin `tool_calls` cevabı |
+| **Şart** | Niyet kelimesi **ve** gereken bilgi birlikte ("sipariş" + 3 haneli numara, "hava" + şehir) | Yönlendirici yakalayamamış ve model aracı gerekli görmüş |
+| **Sonuç modele nasıl gider** | Kullanıcı mesajına `LIVE DATA` olarak, aramayla paralel | `tool` mesajı olarak; model ikinci turda cevabı yazar |
+| **Maliyet** | Ek LLM turu yok | +1 LLM turu (en fazla 2 araç turu, `MAX_TOOL_ROUNDS`) |
+| **Hangi araçlar** | 10 aracın hepsi | 8 araç; iki Wikipedia aracı LLM'e gösterilmez |
+
+Ortak kurallar:
+
+* Her iki yol da `ToolRegistry.execute()` ile çalışır: fazla argümanlar atılır, 8 sn zaman aşımı vardır, hata
+  fırlatılmaz (modele `{"error": ...}` döner).
+* Yedek yolda model henüz bir şey söylemediyse "Bir saniye, kontrol ediyorum." okunur.
+* Model aracı JSON metni olarak yazarsa `LeakedToolCallGuard` (§6.11) bunu seslendirmez, gerçek çağrıya çevirir.
+* Son araç turunda şema verilmez: model cevap vermek zorunda kalır, sonsuz döngü olmaz.
 
 | Araç | Nereden | Hangi soruda (yönlendirici) | Örnek |
 |---|---|---|---|

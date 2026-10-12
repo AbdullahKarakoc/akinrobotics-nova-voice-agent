@@ -315,11 +315,11 @@ function finishAgentMessage(li, ev) {
 
 // ----------------------------------------------------------------- metrics
 const SEGMENTS = [
-  ["endpoint_ms", "Konuşma sonu (VAD)", "--c-vad"],
+  ["endpoint_ms", "Konuşma sonu", "--c-vad"],
   ["stt_ms", "STT", "--c-stt"],
-  ["retrieval_ms", "Bilgi arama", "--c-rag"],
-  ["llm_ms", "LLM ilk cümle", "--c-llm"],
-  ["tts_first_ms", "TTS ilk cümle", "--c-tts"],
+  ["retrieval_ms", "Arama", "--c-rag"],
+  ["llm_ms", "LLM", "--c-llm"],
+  ["tts_first_ms", "TTS", "--c-tts"],
 ];
 
 function showMetrics(m) {

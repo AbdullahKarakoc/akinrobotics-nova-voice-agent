@@ -96,6 +96,23 @@ sorularda tekrar basmanız gerekmez; "Dinlemeyi durdur" mikrofonu kapatır.
 > Mikrofon tarayıcıda yalnızca `localhost` veya HTTPS üzerinden açılır. Kulaklıksız kullanımda ajan kendi sesini
 > duyup kendini kesiyorsa `.env` içine `BARGE_IN=false` yazın.
 
+### Farklı bir bilgisayarda dikkat edilecekler
+
+Proje Windows 11, AMD RX 560X ve 16 GB RAM'li bir dizüstünde geliştirildi ve ölçüldü. Başka bir makinede:
+
+* **Linux + A kurulumu:** Ollama varsayılan olarak yalnızca `127.0.0.1`'i dinler, konteyner ona bağlanamaz
+  ("LLM HAZIR DEĞİL ... connection refused"). Ollama'yı `OLLAMA_HOST=0.0.0.0` ile başlatın.
+* **AMD / Intel ekran kartı:** Ollama'da Vulkan desteği açık olmalı (`OLLAMA_VULKAN=1`). Kapalıysa model hata
+  vermeden işlemcide, yavaş çalışır. Kontrol: `ollama ps` → "GPU" görünmeli. NVIDIA'da ek ayar gerekmez.
+* **8 GB RAM:** B kurulumunda 4B model belleğe sığmayabilir. Küçük modeli kullanın:
+  `LLM_MODEL=qwen3:1.7b-q4_K_M docker compose up`.
+* **Ekran kartı ayarları 4 GB kart içindir** (`LLM_NUM_CTX: 3072`, `LLM_NUM_THREAD: 4`). Büyük kartta sorun
+  çıkarmaz; daha küçük kartta modelin bir kısmı işlemciye taşar ve yavaşlar.
+* **Apple Silicon / ARM:** A kurulumu çalışmalıdır. B kurulumu ARM'da denenmedi.
+* **Hız** makineye göre değişir; README'deki süreler bu dizüstüne aittir.
+* **Port 8000** (B'de 11434) boş olmalı. Wikipedia ve hava durumu araçları internet ister; internet yoksa ajan
+  "bilgi şu an yok" der, çökmez.
+
 ### Ayarlar ve seçenekler
 
 | Ne istiyorsunuz? | Nasıl |
